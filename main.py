@@ -3,6 +3,7 @@ import time
 import copy
 import sys
 import math
+import random
 from pygame.locals import QUIT, KEYDOWN
 from constants import *
 from node import Node
@@ -13,9 +14,52 @@ import numpy as np
 
     TO DO:
 
+        make it so boids appear and disappear each time step
+            a random number between 2 ints is added/deleted
+            randomly pick boids to delete
+            randomly decide where to add them
+            instead of having some boid function
+                have each node move around in a random direction
+                maybe avoid each other (but not neccessary)
+                and with nodes randomly being created and deleted
+
+                what if each node has a start and stop point
+                    they're born at point A (random location)
+                    they move to point B (random location)
+                        avoiding other nodes along the way (not nessessary)
+                    then they die at point B
+
+                    could this achieve networks:
+                        growing
+                        shrinking
+                        splitting
+                        merging
+
+                    for each node:
+                        v0 = get vector to dest
+                        v = v0
+                        for close nodes cn
+                            get angle to node
+                            get opposite angle
+                            vect_magnitude by their closeness (1 / dist)
+                            vector sum to v
+
+                        make velocity like 1 pixel or very small so
+                        if a node is surrounded by a bunch of nodes and its vector sum pushes it into a node
+                        it will be closer the next time but not NEAR at all colliding and now that its closer
+                        its new vector sum will push it away from the node its getting closer to colliding with
+
+
+                    maybe use this
+                    https://github.com/florimondmanca/pyboids
+                    where each boid has its own destination
+
+
+
+
         i need a cellular automata that has
             nodes constantly joining and leaving the network
-            networks constantly spliting and merging
+            networks constantly growing, shrinking, splitting and merging
 
             HOWEVER:
                 when a node joins, it joins a network. It does not try to start its own network
@@ -23,9 +67,13 @@ import numpy as np
                 8 sournding squares
                 if im 1:
                     if 7 or more of my neighboring squares is 1, i turn to 0
-                    if 
+                    if
 
                 if im 0:
+
+        then do create_random_network
+            see constants.py
+            fixed number of nodes in a specifed
 
 
         display:
@@ -33,7 +81,7 @@ import numpy as np
             why is there so many echos?
                 i think each echo is technically to everyone, and its the matching message that specifies who its for
 
-                make it so the ping 
+                make it so the ping
 
             make it so dark blue circle outline that emits from each node to represent sending a message
             draw
@@ -269,7 +317,7 @@ class Model(object):
 
             # every node send out a ping signal and
             # respond to any messages it has received
-            n.nprint(i=i+1, newline=True)
+            # n.nprint(i=i+1, newline=True)
             ping, messages_to_send = n.main_loop()
             if ping != None:
                 self.add_message_to_mid_delivery_messages(ping, n)
@@ -278,7 +326,7 @@ class Model(object):
 
         # update the Nodes in the network every AUTOMATA_PERIOD
         if (t - self.t2) > AUTOMATA_PERIOD:
-            self.evolve_grid()
+            self.evolve_grid(verbose=True)
             self.t2 = t
 
         self.t1 = t # update t1 at end of update()
@@ -348,7 +396,7 @@ class Model(object):
         return networks
 
     # network 0: N nodes constantly throughout all time steps for the entire simulation
-    def create_network0(self, verbose=False):
+    def create_random_network(self, verbose=False):
         nodes = [Node() for _ in range(N)]
         connections = self.get_connections(nodes)
         networks = self.get_networks(nodes, verbose=verbose)
@@ -370,10 +418,6 @@ class Model(object):
     #         print('Created network0 of %d nodes' % N)
     #     return self.nodes
 
-    # network 1: N nodes come in and out randomly over the time steps of the simulation
-    def create_network1(self, verbose=False):
-        pass
-
     # cellular automata
     def create_grid_network(self, verbose=False):
         # create grid with one node at the center
@@ -383,46 +427,142 @@ class Model(object):
             grid_col = []
             for y in range(H):
                 grid_col.append(
-                    Node(x, y) if x == W / 2 and y == H / 2 else str(x)+','+str(y))
+                    Node(x, y) if (x, y) in AUTOMATA_START_POSITIONS['one_center'] else str(x)+','+str(y))
             nodes += grid_col
+        if verbose:
+            for y in range(H):
+                s = ''
+                for x in range(W):
+                    s += ('N' if isinstance(nodes[x*H+y], Node) else '*') + ' '
+                print(s)
+
         connections = self.get_connections(nodes)
-        networks = self.get_networks(nodes, verbose=verbose)
+        # networks = self.get_networks(nodes, verbose=verbose)
         return nodes, connections
-    def evolve_cell(self, x0, y0, nodes):
-
-        # get grid neighbors state
-        neighbours = []
-        for x in range(x0-1, x0+1):
-            for y in range(y0-1, y0+1):
-                if X_MIN <= x <= X_MAX and Y_MIN <= y <= Y_MAX:
-                    if x == x0 and y == y0:
-                        cell0 = nodes[x*H+y]
-                    else:
-                        neighbours.append(nodes[x*H+y])
-
-        # count node neighbours
-        nn = 0
-        for n in neighbours:
-            if n != None:
-                nn += 1
-
-        # conways game of life
-        if isinstance(cell0, Node):
-            if nn < 2:
-                return None
-            elif 1 < nn < 4:
-                return cell0
-            elif 3 < nn:
-                return None
-        else: # cell0 == None
-            if nn == 3:
-                return Node(x0, y0)
-            else:
-                return None
     def evolve_grid(self, verbose=False):
+
+        def evolve_cell(x0, y0, nodes):
+
+            # get grid neighbors state
+            # print('Finding Neighbours (x0, y0) = (%d, %d)' % (x0, y0))
+            neighbours = []
+            for x in range(x0-1, x0+2):
+                for y in range(y0-1, y0+2):
+
+                    # no wrap around
+                    if 0 <= x < W and 0 <= y < H:
+                        if not (x == x0 and y == y0):
+                            # print('x = %d y = %d   %s' % (x, y, 'ALIVE' if isinstance(nodes[x*H+y], Node) else 'dead'))
+                            neighbours.append(nodes[x*H+y])
+
+                    # # wrap around
+                    # x = W-1 if x == -1 else x
+                    # x = 0 if x == W else x
+                    # y = H-1 if y == -1 else y
+                    # y = 0 if y == H else y
+                    # if not (x == x0 and y == y0):
+                    #     print('x = %d y = %d   %s' % (x, y, 'ALIVE' if isinstance(nodes[x*H+y], Node) else 'dead'))
+                    #     neighbours.append(nodes[x*H+y])
+
+            # count neighbouring nodes
+
+            nn = len(list(filter(lambda n : isinstance(n, Node), neighbours)))
+            # print('nn = %d' % nn)
+
+            def conways_game_of_life():
+                cell0 = nodes[x0*H+y0]
+                dead = str(x0)+','+str(y0)
+                print('cell0 at (%d, %d)' % (x0, y0))
+                if isinstance(cell0, Node):
+                    print('ALIVE')
+                    if nn < 2: # Death by isolation
+                        print('Death by isolation')
+                        return dead
+                    elif 1 < nn < 4: # Survival
+                        print('Survival')
+                        return cell0
+                    elif 3 < nn: # Death by overcrowding
+                        print('Death by overcrowding')
+                        return dead
+                else: # cell0 == None
+                    print('dead')
+                    if nn == 3: # Births
+                        print('birth')
+                        return Node(x0, y0)
+                    else:
+                        print('stay dead')
+                        return dead
+            def forest_fire():
+                cell0 = nodes[x0*H+y0]
+                empty   = str(x0)+','+str(y0)
+                burning = empty + ' burning'
+                print('cell0 at (%d, %d)' % (x0, y0))
+                if isinstance(cell0, Node):
+                    print('tree')
+                    if nn < 0: # A tree will burn if at least one neighbor is burning
+                        print('tree will burn if at least one neighbor is burning')
+                        return burning
+                    else:
+                        # A tree ignites with probability F even if no neighbor is burning
+                        return cell0 if random.uniform(0, 1) <= F else burning
+                else: # not a tree
+                    if cell0.endswith(' burning'): # A burning cell turns into an empty cell
+                        print('burning')
+                        return empty
+                    else: # An empty space fills with a tree with probability p
+                        print('empty')
+                        return Node(x0, y0) if random.uniform(0, 1) <= P else cell0
+            def forest():
+                cell0 = nodes[x0*H+y0]
+                empty = str(x0)+','+str(y0)
+                pn = float(nn/8) # percent neighbors
+                if isinstance(cell0, Node): # tree
+                    # the more trees there are around a tree,
+                    # the more likely the tree will die (become an empty space)
+                    # a tree will not die if it has no neighbours
+                    return cell0 if nn == 0 or random.uniform(0, 1) <= 1.00 - pn*percent_trees else empty
+
+                else: # empty
+                    # a tree can only grow if there is at least 1 neighbor
+                    # the less nn there are around an empty space the more likely a tree will grow
+                    # nn: min=0, max=8
+                    # probablility: min=0, max=100
+                    # if few  neighbors: high likelyhood
+                    # if many neighbors: low  likelyhood 8n 1/9 p
+                    return Node(x0, y0) if nn > 0 and random.uniform(0, 1) <= 1.00 - pn*percent_trees else empty
+
+            return forest()
+
+        # for forest growth
+        num_trees = len(list(filter(lambda n :     isinstance(n, Node), self.nodes)))
+        num_empty = len(list(filter(lambda n : not isinstance(n, Node), self.nodes)))
+        percent_trees = float(num_trees) / num_empty
+
+        nodes = []
         for x in range(W):
             for y in range(H):
-                self.nodes[x*H+y] = self.evolve_cell(x, y, self.nodes)
+                # print()
+                nodes.append(evolve_cell(x, y, self.nodes))
+
+        # ensure we never delete all the nodes
+        if nodes:
+            non_empty_nodes = []
+            for n in self.nodes:
+                if isinstance(n, Node):
+                    non_empty_nodes.append(n)
+        nodes = [non_empty_nodes[random.randint(len(non_empty_nodes))]] if nodes == [] else nodes
+
+        self.nodes = nodes
+        self.connections = self.get_connections(self.nodes)
+
+        if verbose:
+            print('Grid Evolution')
+            for y in range(H):
+                s = ''
+                for x in range(W):
+                    s += ('N' if isinstance(self.nodes[x*H+y], Node) else '*') + ' '
+                print(s)
+            print('------------------------------------------------------')
 
     def add_message_to_mid_delivery_messages(self, message, n0):
         neighbors = self.get_direct_neighbors(n0, self.nodes, verbose=True)

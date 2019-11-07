@@ -58,27 +58,30 @@ class Node:
 		# map of pings to the time they were sent out
 		# key   = ping random string
 		# value = time ping was sent
-		self.pings = {}
-		self.time_of_last_ping = None
+		self.pings = {
+			'received' : {},
+			'sent'     : {}
+		}
+		self.time_of_last_ping0 = None
 
 	def main_loop(self):
 		t = time.time() # unix time, example: 1424233311.771502
 
-		# ping
+		# ping on PING_FREQUENCY
 		ping = None
-		if self.time_of_last_ping == None \
-		or 1.0 / (t - self.time_of_last_ping) < PING_FREQUENCY:
-			ping = self.ping()
-			self.pings = self.update_ping_list(ping, t)
-			self.time_of_last_ping = t
+		# if self.time_of_last_ping0 == None \
+		# or 1.0 / (t - self.time_of_last_ping0) < PING_FREQUENCY:
+		# 	ping = self.ping0()
+		# 	self.pings = self.update_ping_list(ping, t)
+		# 	self.time_of_last_ping = t
 
-		messages_to_send = self.respond_to_messages()
+		messages_to_send = [] #self.respond_to_messages()
 		return ping, messages_to_send
 
 	def update_ping_list(self, p, t):
 
 		# save most recent ping
-		rs = p.m.split('\n')[1] # rs = random string
+		rs = p.m.split('\n')[2] # rs = random string
 		self.pings[rs] = t
 
 		# trim old pings that are out of range R
@@ -101,6 +104,7 @@ class Node:
 		new_random_string = self.create_random_string()
 		return Message(
 			'PING!\n' + \
+			'Hi Node: %s\n' %  + \
 			'This is the random string you sent me.\n' + \
 			'%s\n' % old_random_string + \
 			'Send me back this new random string.\n' + \
@@ -109,6 +113,20 @@ class Node:
 			'\n' + \
 			'Sincerely,' + \
 			'Node: %s\n' % self.pk)
+
+	def ping0(self, old_random_string):
+		new_random_string = self.create_random_string()
+		return Message(
+			'PING!\n' + \
+			'If you would like to start a ping cycle with me,\n' + \
+			'Send me back this new random string.\n' + \
+			'%s\n' % new_random_string + \
+			'and sign it please.\n' + \
+			'\n' + \
+			'Sincerely,' + \
+			'Node: %s\n' % self.pk)
+
+
 
 	def echo(self, m):
 		specifed_random_string_to_echo = m.m.split('\n')[1]
