@@ -7,16 +7,33 @@ from pygame.locals import QUIT, KEYDOWN
 from constants import *
 from node import Node
 from message import Message
-
+import numpy as np
 
 ''' NOTES:
 
     TO DO:
 
+        i need a cellular automata that has
+            nodes constantly joining and leaving the network
+            networks constantly spliting and merging
+
+            HOWEVER:
+                when a node joins, it joins a network. It does not try to start its own network
+
+                8 sournding squares
+                if im 1:
+                    if 7 or more of my neighboring squares is 1, i turn to 0
+                    if 
+
+                if im 0:
+
+
         display:
 
             why is there so many echos?
                 i think each echo is technically to everyone, and its the matching message that specifies who its for
+
+                make it so the ping 
 
             make it so dark blue circle outline that emits from each node to represent sending a message
             draw
@@ -84,6 +101,7 @@ class PyGameView(object):
 
     def draw_nodes(self):
         for n in model.nodes:
+            if not isinstance(n, Node): continue
             x = int(SCREEN_SCALE*n.x)
             y = int(SCREEN_SCALE*n.y)
             pygame.draw.circle(
@@ -209,18 +227,66 @@ class Model(object):
         '''
 
         # create network
-        self.nodes, self.connections = self.create_network0(verbose=True)
-        # self.nodes = self.create_network1(verbose=True)
+        # self.nodes, self.connections = self.create_network0(verbose=True)
+        # self.nodes, self.connections = self.create_network1(verbose=True)
+        self.nodes, self.connections = self.create_grid_network(verbose=True)
 
         # list of messages that are being delivered. Used just for time delay in simulation
         # format: [(receiver_node, delivery_time, message), ...]
         self.mid_delivery_messages = []
 
-
-        self.t1 = None # t1 = 1 time step in the past
+        t = time.time()
+        self.t1 = t # t1 = time of previous time step (1 time step in the past)
+        self.t2 = t # t2 = time of previous cellular
 
         # window parameters / drawing
         self.show = True # show current model
+
+
+
+    # this function updates the model
+    def update(self, controller):
+
+        # move message signals forward,
+        # deliver message if it's reached the receiver_node,
+        # else keep it in the mid_delivery_messages list
+        t = time.time()
+        new_mid_delivery_messages = []
+        for d in self.mid_delivery_messages:
+            d['dist_traveled'] += (SIGNAL_SPEED * (t - self.t1))
+            if d['dist_traveled'] >= d['dist_to_travel']:
+                rn = d['receiver_node']
+                m  = d['message']
+                rn.messages.append(m)
+            else:
+                new_mid_delivery_messages.append(d)
+        self.mid_delivery_messages = new_mid_delivery_messages
+
+        # run the main loop of each node
+        for i, n in enumerate(self.nodes):
+
+            if not isinstance(n, Node): continue
+
+            # every node send out a ping signal and
+            # respond to any messages it has received
+            n.nprint(i=i+1, newline=True)
+            ping, messages_to_send = n.main_loop()
+            if ping != None:
+                self.add_message_to_mid_delivery_messages(ping, n)
+            for m in messages_to_send:
+                self.add_message_to_mid_delivery_messages(m, n)
+
+        # update the Nodes in the network every AUTOMATA_PERIOD
+        if (t - self.t2) > AUTOMATA_PERIOD:
+            self.evolve_grid()
+            self.t2 = t
+
+        self.t1 = t # update t1 at end of update()
+
+        #     input()
+
+        # sys.exit()
+
 
     def fully_connected_network(self):
         for n in self.nodes:
@@ -232,12 +298,25 @@ class Model(object):
     def get_connections(self, nodes):
         connections = []
         for n0 in nodes:
-            n1s = self.get_direct_neighbors(n0, nodes)
-            for n1 in n1s:
-                if (n0, n1) not in connections \
-                and (n1, n0) not in connections:
-                    connections.append((n0, n1))
+            if isinstance(n0, Node):
+                n1s = self.get_direct_neighbors(n0, nodes)
+                for n1 in n1s:
+                    if (n0, n1) not in connections \
+                    and (n1, n0) not in connections:
+                        connections.append((n0, n1))
         return connections
+
+    def get_direct_neighbors(self, n0, nodes, verbose=False):
+        neighbors = {} # key = neighboring node, value = range
+        for n in nodes:
+            if isinstance(n, Node) and n != n0:
+                dist = math.sqrt((n.x - n0.x)**2 + (n.y - n0.y)**2)
+                if dist <= R:
+                    neighbors[n] = dist
+        if verbose:
+            print('%d Direct Neighbors:' % len(neighbors.keys()))
+            for neighbor in neighbors.keys(): neighbor.nprint(newline=False)
+        return neighbors
 
     # return a list of node networks
     def get_networks(self, nodes, verbose=False):
@@ -250,6 +329,7 @@ class Model(object):
             return network
 
         networks = []
+        nodes = list(filter(lambda n : isinstance(n, Node), nodes)) # for cellular automata
         unvisited_nodes = copy.deepcopy(nodes)
         while len(unvisited_nodes) > 0:
             n0 = unvisited_nodes[0]
@@ -273,10 +353,6 @@ class Model(object):
         connections = self.get_connections(nodes)
         networks = self.get_networks(nodes, verbose=verbose)
         return nodes, connections
-
-    # def create_network0(self, verbose=False):
-    #     return [Node() for _ in range(N)]
-
     # def create_network0(self, verbose=False):
     #     self.nodes = [Node()]
     #     while len(self.nodes) < N:
@@ -298,17 +374,55 @@ class Model(object):
     def create_network1(self, verbose=False):
         pass
 
-    def get_direct_neighbors(self, n0, nodes, verbose=False):
-        neighbors = {} # key = neighboring node, value = range
-        for n in nodes:
-            if n != n0:
-                dist = math.sqrt((n.x - n0.x)**2 + (n.y - n0.y)**2)
-                if dist <= R:
-                    neighbors[n] = dist
-        if verbose:
-            print('%d Direct Neighbors:' % len(neighbors.keys()))
-            for neighbor in neighbors.keys(): neighbor.nprint(newline=False)
-        return neighbors
+    # cellular automata
+    def create_grid_network(self, verbose=False):
+        # create grid with one node at the center
+        # nodes = np.array([[Node(x, y) for x in range(W)] for y in range(H)]).flatten().tolist()
+        nodes = []
+        for x in range(W):
+            grid_col = []
+            for y in range(H):
+                grid_col.append(
+                    Node(x, y) if x == W / 2 and y == H / 2 else str(x)+','+str(y))
+            nodes += grid_col
+        connections = self.get_connections(nodes)
+        networks = self.get_networks(nodes, verbose=verbose)
+        return nodes, connections
+    def evolve_cell(self, x0, y0, nodes):
+
+        # get grid neighbors state
+        neighbours = []
+        for x in range(x0-1, x0+1):
+            for y in range(y0-1, y0+1):
+                if X_MIN <= x <= X_MAX and Y_MIN <= y <= Y_MAX:
+                    if x == x0 and y == y0:
+                        cell0 = nodes[x*H+y]
+                    else:
+                        neighbours.append(nodes[x*H+y])
+
+        # count node neighbours
+        nn = 0
+        for n in neighbours:
+            if n != None:
+                nn += 1
+
+        # conways game of life
+        if isinstance(cell0, Node):
+            if nn < 2:
+                return None
+            elif 1 < nn < 4:
+                return cell0
+            elif 3 < nn:
+                return None
+        else: # cell0 == None
+            if nn == 3:
+                return Node(x0, y0)
+            else:
+                return None
+    def evolve_grid(self, verbose=False):
+        for x in range(W):
+            for y in range(H):
+                self.nodes[x*H+y] = self.evolve_cell(x, y, self.nodes)
 
     def add_message_to_mid_delivery_messages(self, message, n0):
         neighbors = self.get_direct_neighbors(n0, self.nodes, verbose=True)
@@ -320,44 +434,6 @@ class Model(object):
                 'dist_to_travel' : math.sqrt((n0.x - neighbor.x)**2 + (n0.y - neighbor.y)**2),
                 'message'        : message
             })
-
-
-    # this function updates the model
-    def update(self, controller):
-
-        # move message signals forward,
-        # deliver them if they've reached the receiver node,
-        # else keep them in the mid_delivery_messages list
-        t = time.time()
-        new_mid_delivery_messages = []
-        for d in self.mid_delivery_messages:
-            d['dist_traveled'] += (SIGNAL_SPEED * (t - self.t1))
-            if d['dist_traveled'] >= d['dist_to_travel']:
-                rn = d['receiver_node']
-                m  = d['message']
-                rn.messages.append(m)
-            else:
-                new_mid_delivery_messages.append(d)
-        self.mid_delivery_messages = new_mid_delivery_messages
-
-        # run the main loop of each node
-        for i, n in enumerate(self.nodes):
-
-            # every node send out a ping signal and
-            # respond to any messages it has
-            n.nprint(i=i+1, newline=True)
-            ping, messages_to_send = n.main_loop()
-            if ping != None:
-                self.add_message_to_mid_delivery_messages(ping, n)
-            for m in messages_to_send:
-                self.add_message_to_mid_delivery_messages(m, n)
-
-
-        self.t1 = t # update t1 at end of update()
-
-        #     input()
-
-        # sys.exit()
 
 
 class PyGameKeyboardController(object):

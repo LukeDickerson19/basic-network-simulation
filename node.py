@@ -6,11 +6,15 @@ from message import Message
 
 class Node:
 
-	def __init__(self):
+	def __init__(self, x=None, y=None, grid=True):
 
 		# coordinates of this node
-		self.x = random.uniform(X_MIN, X_MAX)
-		self.y = random.uniform(Y_MIN, Y_MAX)
+		if grid:
+			self.x = x
+			self.y = y
+		else:
+			self.x = random.uniform(X_MIN, X_MAX)
+			self.y = random.uniform(Y_MIN, Y_MAX)
 
 		self.sk = self.create_random_string() # sk = secret key
 		self.pk = '' # pk = public key
@@ -93,11 +97,18 @@ class Node:
 		return ''.join(
 			random.choice(ALL_CHARS) for i in range(string_length))
 
-	def ping(self):
-		random_string = self.create_random_string()
+	def ping(self, old_random_string):
+		new_random_string = self.create_random_string()
 		return Message(
-			'PING, send me back this exact random string\n%s\nand your public key.' \
-			% random_string)
+			'PING!\n' + \
+			'This is the random string you sent me.\n' + \
+			'%s\n' % old_random_string + \
+			'Send me back this new random string.\n' + \
+			'%s\n' % new_random_string + \
+			'and sign it please.\n' + \
+			'\n' + \
+			'Sincerely,' + \
+			'Node: %s\n' % self.pk)
 
 	def echo(self, m):
 		specifed_random_string_to_echo = m.m.split('\n')[1]

@@ -1,21 +1,23 @@
+import math
 import string
 
 
-
 # network 0: N nodes constantly throughout all time steps for the entire simulation
-N = 4#100 # number of nodes in the network
+W = 5
+H = 5
+N = W * H #100 # number of nodes in the network
 
 
 # network 1: N nodes come in and out randomly over the time steps of the simulation
 # N = 100
 
-R = 33 # max signal radius of each node
+R = int(5.05 * math.sqrt(2)) # max signal radius of each node
 SIGNAL_SPEED = 3.5 # how far the signal travels per second
 PING_FREQUENCY = 0.5 # number of pings per second
 
 # coordinate range of 2D rectangular map
-X_MIN, X_MAX = 0.00, 30.00
-Y_MIN, Y_MAX = 0.00, 30.00
+X_MIN, X_MAX = 0.00, 25.00
+Y_MIN, Y_MAX = 0.00, 25.00
 
 # coordinate range of 3D globe
 # pass
@@ -41,4 +43,9 @@ CONTROL_KEY = [
 	"	v = Toggle view drawing",
 	"	k = Toggle Control Key",
 ]
+
+
+
+# CELLULAR AUTOMATA
+AUTOMATA_PERIOD = 2.0 # period of time (in seconds) that a turn lasts
 
