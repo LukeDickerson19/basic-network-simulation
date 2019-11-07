@@ -49,6 +49,8 @@ import numpy as np
                         it will be closer the next time but not NEAR at all colliding and now that its closer
                         its new vector sum will push it away from the node its getting closer to colliding with
 
+                        each message will need a sent_pos = (x, y) to exand from where it was sent originally
+
 
                     maybe use this
                     https://github.com/florimondmanca/pyboids
