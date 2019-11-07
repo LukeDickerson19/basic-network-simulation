@@ -15,6 +15,9 @@ from message import Message
 
         display:
 
+            why is there so many echos?
+                i think each echo is technically to everyone, and its the matching message that specifies who its for
+
             make it so dark blue circle outline that emits from each node to represent sending a message
             draw
 
@@ -80,8 +83,6 @@ class PyGameView(object):
 
 
     def draw_nodes(self):
-
-        # draw nodes
         for n in model.nodes:
             x = int(SCREEN_SCALE*n.x)
             y = int(SCREEN_SCALE*n.y)
@@ -99,35 +100,54 @@ class PyGameView(object):
                 pygame.Color('blue'),
                 (x1, y1), (x2, y2), 1)
 
-    def draw_message(self, d, color):
+    def draw_message_dot(self, d, color):
         sn, rn = d['sender_node'], d['receiver_node']
         mx = int(SCREEN_SCALE * ((d['dist_traveled'] / d['dist_to_travel'])*(rn.x - sn.x) + sn.x))
         my = int(SCREEN_SCALE * ((d['dist_traveled'] / d['dist_to_travel'])*(rn.y - sn.y) + sn.y))
         pygame.draw.circle(
             self.surface,
             pygame.Color(color),
-            (mx, my), 1) # (x,y), radius
+            (mx, my), 2) # (x,y), radius
+
+    def draw_message_circle(self, d, color, fade=True):
+        sn = d['sender_node']
+        r = d['dist_traveled']
+        if fade:
+            non_zero_rgb_value = int(255 * ((float(R - r) / R)**10 if r < R else 0.0))
+            if color == 'darkgreen': color = (0, non_zero_rgb_value, 0)
+            if color == 'cyan':      color = (0, 0, non_zero_rgb_value)
+            if color == 'darkred':   color = (non_zero_rgb_value, 0, 0)
+        else:
+            color = pygame.Color(color)
+        r = int(SCREEN_SCALE * r)
+        if r > 1:
+            x = int(SCREEN_SCALE * sn.x)
+            y = int(SCREEN_SCALE * sn.y)
+            pygame.draw.circle(
+                self.surface,
+                color,
+                (x, y), r, 1) # (x,y), radius
 
     def draw_pings(self):
         for d in self.model.mid_delivery_messages:
             if d['sender_node'] == model.nodes[0]: # just draw 1 node's ping right now
                 if d['message'].m.startswith('PING'):
-                    self.draw_message(d, 'green')
+                    self.draw_message_circle(d, 'darkgreen', fade=True)
+                    self.draw_message_dot(d, 'green')
 
     def draw_echos(self):
         for d in self.model.mid_delivery_messages:
             if d['receiver_node'] == model.nodes[0]: # just draw 1 node's echo right now
-                print('aasdaayayayyyyyyy')
-                print(d['message'].m)
                 if d['message'].m.startswith('ECHO'):
-                    print('draw echo')
-                    self.draw_message(d, 'red')
+                    self.draw_message_circle(d, 'darkred', fade=True)
+                    self.draw_message_dot(d, 'red')
 
     def draw_messages(self):
         for d in self.model.mid_delivery_messages:
             if not d['message'].m.startswith('PING') \
             and not d['message'].m.startswith('ECHO'):
-                self.draw_message(d, 'cyan')
+                self.draw_message_circle(d, 'cyan', fade=True)
+                self.draw_message_dot(d, 'cyan')
 
     def draw(self):
 

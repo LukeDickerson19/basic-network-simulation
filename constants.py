@@ -3,7 +3,7 @@ import string
 
 
 # network 0: N nodes constantly throughout all time steps for the entire simulation
-N = 2#100 # number of nodes in the network
+N = 4#100 # number of nodes in the network
 
 
 # network 1: N nodes come in and out randomly over the time steps of the simulation
