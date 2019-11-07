@@ -1,5 +1,7 @@
 import pygame
 import time
+import copy
+import sys
 import math
 from pygame.locals import QUIT, KEYDOWN
 from constants import *
@@ -7,13 +9,45 @@ from node import Node
 from message import Message
 
 
-
 ''' NOTES:
 
     TO DO:
 
+        display:
+
+            make it so dark blue circle outline that emits from each node to represent sending a message
+            draw
+
+            make each node have a number in its circle in the display (just its index in the list of all nodes)
+
+            make it so you can click on a node
+
+                when you click on a node, information appears about
+                its public key
+                its messages list
+
+                make it so you can toggle viewing that nodes range
+
+                make it so you can toggle drawing connection lines to this node's direct neighbors
+
+                make it so you can change R (and maybe other constants) mid simulation
+
+            make it so you can send a message manually from one node to another
+
+            make it so you can toggle drawing all connection lines between nodes (dark blue)
+            make it so pings are sent out as green line segments along the connection line
+            make it so echos are sent out as red   line segments along the connection line
+
+            make it so you can toggle drawing messages as expanding circles
+                pings are dark green circles
+                echos are dark red circles
+                messages are dark blue circles
+
+            maybe make messages of all kinds fade as they get farther away
+
+
         see create_network0
-            figure out how to get a fully connected network that is distributed evenly 
+            figure out how to get a fully connected network that is distributed evenly
             over the entire area ... more or less
 
     SOURCES:
@@ -38,16 +72,14 @@ class PyGameView(object):
     def __init__(self, model, show_view=True):
 
         self.model = model
-        self.screen = pygame.display.set_mode(SCREEN_SIZE) # a pygame screen 
+        self.screen = pygame.display.set_mode(SCREEN_SIZE) # a pygame screen
         self.surface = pygame.Surface(SCREEN_SIZE) # a pygame surface is the thing you draw on
 
         self.show_view = show_view # toggle display
         self.show_controls = False # toggle control display
-        
-    def draw(self):
 
-        # fill background
-        self.surface.fill(pygame.Color('black'))
+
+    def draw_nodes(self):
 
         # draw nodes
         for n in model.nodes:
@@ -55,9 +87,58 @@ class PyGameView(object):
             y = int(SCREEN_SCALE*n.y)
             pygame.draw.circle(
                 self.surface,
-                pygame.Color('blue'),
+                pygame.Color('cyan'),
                 (x, y), 5) # (x,y), radius
 
+    def draw_in_range_connections(self):
+        for (n1, n2) in model.connections:
+            x1, y1 = int(SCREEN_SCALE*n1.x), int(SCREEN_SCALE*n1.y)
+            x2, y2 = int(SCREEN_SCALE*n2.x), int(SCREEN_SCALE*n2.y)
+            pygame.draw.line(
+                self.surface,
+                pygame.Color('blue'),
+                (x1, y1), (x2, y2), 1)
+
+    def draw_message(self, d, color):
+        sn, rn = d['sender_node'], d['receiver_node']
+        mx = int(SCREEN_SCALE * ((d['dist_traveled'] / d['dist_to_travel'])*(rn.x - sn.x) + sn.x))
+        my = int(SCREEN_SCALE * ((d['dist_traveled'] / d['dist_to_travel'])*(rn.y - sn.y) + sn.y))
+        pygame.draw.circle(
+            self.surface,
+            pygame.Color(color),
+            (mx, my), 1) # (x,y), radius
+
+    def draw_pings(self):
+        for d in self.model.mid_delivery_messages:
+            if d['sender_node'] == model.nodes[0]: # just draw 1 node's ping right now
+                if d['message'].m.startswith('PING'):
+                    self.draw_message(d, 'green')
+
+    def draw_echos(self):
+        for d in self.model.mid_delivery_messages:
+            if d['receiver_node'] == model.nodes[0]: # just draw 1 node's echo right now
+                print('aasdaayayayyyyyyy')
+                print(d['message'].m)
+                if d['message'].m.startswith('ECHO'):
+                    print('draw echo')
+                    self.draw_message(d, 'red')
+
+    def draw_messages(self):
+        for d in self.model.mid_delivery_messages:
+            if not d['message'].m.startswith('PING') \
+            and not d['message'].m.startswith('ECHO'):
+                self.draw_message(d, 'cyan')
+
+    def draw(self):
+
+        # fill background
+        self.surface.fill(pygame.Color('black'))
+
+        self.draw_in_range_connections()
+        self.draw_pings()
+        self.draw_echos()
+        # self.draw_messages()
+        self.draw_nodes()
 
         # # example shapes
         # pygame.draw.circle(self.surface, pygame.Color('green'), (250,250), 10) # (x,y), radius
@@ -73,7 +154,7 @@ class PyGameView(object):
         # update display
         pygame.display.update()
 
-        
+
     def draw_text(self, text, x, y, size, \
         text_color = (100, 100, 100), \
         background_color = (0, 0, 0)):
@@ -92,7 +173,6 @@ class PyGameView(object):
         self.surface.blit(text_render, (x, y))
 
 
-
 class Model(object):
     '''
         Model represents the state of all entities in
@@ -108,34 +188,83 @@ class Model(object):
             height (int): height of window in pixels
         '''
 
-        # list of messages that are being delivered # used just for time delay in simulation
-        # sorted by delivery_time. [(receiver_node, delivery_time, p), ...]
+        # create network
+        self.nodes, self.connections = self.create_network0(verbose=True)
+        # self.nodes = self.create_network1(verbose=True)
+
+        # list of messages that are being delivered. Used just for time delay in simulation
+        # format: [(receiver_node, delivery_time, message), ...]
         self.mid_delivery_messages = []
 
-        # create network
-        self.nodes = self.create_network0(verbose=True)
-        # self.nodes = self.create_network1()
 
+        self.t1 = None # t1 = 1 time step in the past
 
-        #window parameters / drawing
+        # window parameters / drawing
         self.show = True # show current model
 
     def fully_connected_network(self):
         for n in self.nodes:
-            neighbors = self.find_neighbors_in_range(n)
+            neighbors = self.get_direct_neighbors(n)
             if len(neighbors.keys()) == 0:
                 return False
         return True
 
+    def get_connections(self, nodes):
+        connections = []
+        for n0 in nodes:
+            n1s = self.get_direct_neighbors(n0, nodes)
+            for n1 in n1s:
+                if (n0, n1) not in connections \
+                and (n1, n0) not in connections:
+                    connections.append((n0, n1))
+        return connections
+
+    # return a list of node networks
+    def get_networks(self, nodes, verbose=False):
+
+        def get_network_recurrsively(n0, network):
+            network += [n0]
+            for n in self.get_direct_neighbors(n0, unvisited_nodes):
+                if n not in network:
+                    network = get_network_recurrsively(n, network)
+            return network
+
+        networks = []
+        unvisited_nodes = copy.deepcopy(nodes)
+        while len(unvisited_nodes) > 0:
+            n0 = unvisited_nodes[0]
+            network = get_network_recurrsively(n0, [])
+            networks.append(network)
+            for n in network:
+                unvisited_nodes.remove(n)
+
+        if verbose:
+            print('\n%d Networks:' % len(networks))
+            for i, network in enumerate(networks):
+                print('\nNetwork %d has %d node(s)' % (i+1, len(network)))
+                for n in network:
+                    n.nprint()
+
+        return networks
+
     # network 0: N nodes constantly throughout all time steps for the entire simulation
     def create_network0(self, verbose=False):
-        self.nodes = [Node()]
-        while len(self.nodes) < N:
-            n = Node()
-            self.nodes.append(n)
-            if len(self.find_neighbors_in_range(n).keys()) == 0:
-                self.nodes.remove(n)
-        return self.nodes
+        nodes = [Node() for _ in range(N)]
+        connections = self.get_connections(nodes)
+        networks = self.get_networks(nodes, verbose=verbose)
+        return nodes, connections
+
+    # def create_network0(self, verbose=False):
+    #     return [Node() for _ in range(N)]
+
+    # def create_network0(self, verbose=False):
+    #     self.nodes = [Node()]
+    #     while len(self.nodes) < N:
+    #         n = Node()
+    #         self.nodes.append(n)
+    #         if len(self.get_direct_neighbors(n).keys()) == 0:
+    #             self.nodes.remove(n)
+    #     return self.nodes
     # def create_network0(self, verbose=False):
     #     self.nodes = [Node() for _ in range(N)]
     #     while not self.fully_connected_network():
@@ -146,12 +275,12 @@ class Model(object):
     #     return self.nodes
 
     # network 1: N nodes come in and out randomly over the time steps of the simulation
-    def create_network1(self):
+    def create_network1(self, verbose=False):
         pass
 
-    def find_neighbors_in_range(self, n0, verbose=False):
+    def get_direct_neighbors(self, n0, nodes, verbose=False):
         neighbors = {} # key = neighboring node, value = range
-        for n in self.nodes:
+        for n in nodes:
             if n != n0:
                 dist = math.sqrt((n.x - n0.x)**2 + (n.y - n0.y)**2)
                 if dist <= R:
@@ -161,40 +290,50 @@ class Model(object):
             for neighbor in neighbors.keys(): neighbor.nprint(newline=False)
         return neighbors
 
-    def travel_time(self, dist):
-        return float(dist) / SIGNAL_SPEED
-
-    def add_message_to_mid_delivery_messages(self, ping, n0):
-        neighbors = self.find_neighbors_in_range(n0, verbose=True)
+    def add_message_to_mid_delivery_messages(self, message, n0):
+        neighbors = self.get_direct_neighbors(n0, self.nodes, verbose=True)
         for neighbor, dist in neighbors.items():
             self.mid_delivery_messages.append({
-                'receiver_node' : neighbor,
-                'delivery_time' : time.time() + self.travel_time(dist),
-                'message'       : ping
+                'sender_node'    : n0,
+                'receiver_node'  : neighbor,
+                'dist_traveled'  : 0.00,
+                'dist_to_travel' : math.sqrt((n0.x - neighbor.x)**2 + (n0.y - neighbor.y)**2),
+                'message'        : message
             })
 
 
     # this function updates the model
     def update(self, controller):
 
-        # model, deliver any messages that need to be delivered
+        # move message signals forward,
+        # deliver them if they've reached the receiver node,
+        # else keep them in the mid_delivery_messages list
         t = time.time()
+        new_mid_delivery_messages = []
         for d in self.mid_delivery_messages:
-            dt = d['delivery_time']
-            if dt < t:
+            d['dist_traveled'] += (SIGNAL_SPEED * (t - self.t1))
+            if d['dist_traveled'] >= d['dist_to_travel']:
                 rn = d['receiver_node']
                 m  = d['message']
                 rn.messages.append(m)
+            else:
+                new_mid_delivery_messages.append(d)
+        self.mid_delivery_messages = new_mid_delivery_messages
 
+        # run the main loop of each node
         for i, n in enumerate(self.nodes):
-    
+
             # every node send out a ping signal and
             # respond to any messages it has
             n.nprint(i=i+1, newline=True)
-            p, es = n.main_loop()
-            self.add_message_to_mid_delivery_messages(p, n)
-            for echo in es:
-                self.add_message_to_mid_delivery_messages(e, n)
+            ping, messages_to_send = n.main_loop()
+            if ping != None:
+                self.add_message_to_mid_delivery_messages(ping, n)
+            for m in messages_to_send:
+                self.add_message_to_mid_delivery_messages(m, n)
+
+
+        self.t1 = t # update t1 at end of update()
 
         #     input()
 
@@ -270,11 +409,12 @@ if __name__ == '__main__':
     while running:
 
         # output frame rate
-        iterations += 1
-        if time.time() - start_time > 1:
-            start_time += 1
-            print('%s fps' % iterations)
-            iterations = 0
+        if OUTPUT_FRAME_RATE:
+            iterations += 1
+            if time.time() - start_time > 1:
+                start_time += 1
+                print('%s fps' % iterations)
+                iterations = 0
 
         # handle user input
         for event in pygame.event.get():
@@ -282,11 +422,11 @@ if __name__ == '__main__':
                 running = False
             else:
                 controller.handle_event(event)
-                
+
         # update the model
         if not controller.paused:
             model.update(controller)
-        
+
         # display the view
         if view.show_view:
             view.draw()
@@ -294,7 +434,6 @@ if __name__ == '__main__':
             pygame.display.update()
 
             # time.sleep(1.0) # control frame rate (in seconds)
-
 
     pygame.quit()
     sys.exit()

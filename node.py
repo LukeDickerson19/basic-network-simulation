@@ -24,10 +24,10 @@ class Node:
 			value: {
 				'known_min_distance'  : 4.556284
 				'claimed_coordinates' : (10.0, 12.5),
-				'neighbors' : { ... repeats ... }	
+				'neighbors' : { ... repeats ... }
 			}
-	
-			Example:			
+
+			Example:
 			self.neighbors = {
 				0 : {
 						'pk0' : {
@@ -36,14 +36,14 @@ class Node:
 							'neighbors' : { ... }
 						},
 						'pk1' : {
-				
+
 						},
 						'pk2' : {
-				
+
 						}
 				},
 				1 : {
-	
+
 				}
 
 			}
@@ -55,13 +55,21 @@ class Node:
 		# key   = ping random string
 		# value = time ping was sent
 		self.pings = {}
+		self.time_of_last_ping = None
 
 	def main_loop(self):
 		t = time.time() # unix time, example: 1424233311.771502
-		p = self.ping()
-		self.pings = self.update_ping_list(p, t)
-		es = self.respond_to_messages()
-		return p, es
+
+		# ping
+		ping = None
+		if self.time_of_last_ping == None \
+		or 1.0 / (t - self.time_of_last_ping) < PING_FREQUENCY:
+			ping = self.ping()
+			self.pings = self.update_ping_list(ping, t)
+			self.time_of_last_ping = t
+
+		messages_to_send = self.respond_to_messages()
+		return ping, messages_to_send
 
 	def update_ping_list(self, p, t):
 
@@ -95,18 +103,21 @@ class Node:
 		specifed_random_string_to_echo = m.m.split('\n')[1]
 		return self.send_message('ECHO\n' + specifed_random_string_to_echo + '\n' + self.pk)
 
-
 	def respond_to_messages(self):
-
+		messages_to_send = []
+		self_messages_new = []
 		for m in self.messages:
-			
-			if m.m.startswith('PING'): self.echo(m)
-			# if m.m.startswith('ECHO'):
+			if m.m.startswith('PING'):
+				messages_to_send.append(self.echo(m))
 
-		self.messages = []
+				# if m.m.startswith('ECHO'):
 
-		return []
+			else: # default of switch (why doesn't python have switches?)
+				self_messages_new.append(m)
 
+
+		self.messages = self_messages_new
+		return messages_to_send
 
 	def send_message(self, m, rpk=None):
 		# t   = time of sending this message (int)
