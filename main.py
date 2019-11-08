@@ -16,16 +16,28 @@ import numpy as np
 
 ''' NOTES:
 
+    DESCRIPTION:
+
+    SOURCES:
+
+        https://www.pygame.org/docs/
+
+        PyGame color Codes
+        https://www.webucator.com/blog/2015/03/python-color-constants-module/
+
+    OTHER:
+
+    IDEAS:
+
+        if the first neighbor can verify the sender is who they say they are, they can pass on that verification, and then verify they're who THEY say they are, and the 2nd neighbor can verify the same, ... and a path can be built
+
+        what if you used the position triangluation to verify that someone isn't using a server farm to run a bunch of nodes
+        in order for nodes to count they need to be spread out (and moving frequenty? what about desktops) to exibit normal device behavior
+
     TO DO:
 
         NOW:
 
-            do controlss
-                pause movement but not signals
-                    how much faster are the signals simulated paused/unpaused?
-                click on node
-                    view range
-                    view pings, incoming echoes, outgoing/incoming messages
             do signal stuff
                 make mid_delivery_messages not have a receiver node
                     if distance between the send_pt and a device is inbetween the
@@ -79,10 +91,19 @@ import numpy as np
                         echos are dark red circles
                         messages are dark blue circles
 
+                self.model.selected_device
+                    view pings, incoming echoes, outgoing/incoming messages
+
+                how much faster are the signals simulated paused/unpaused?
+
                 keep ping the way it was originally made,
                 but increase the speed, and decrease the period
                 because in reality, if they ping/pong back and forth it will take up unnessessary amounts of band width
                     so doing it on a period is better
+
+            do controls
+                manually send message to another node
+
 
         EVENTUALLY:
 
@@ -93,6 +114,9 @@ import numpy as np
                         what about dictionaries though?
                             aren't dictionary keys a set in python?
                                 does deleting from a set mess up iterating over it?
+
+            model could be faster if we did more stuff in parallel using async lib
+                https://realpython.com/async-io-python/
 
             make static map and cellular automata maps
                 figure out how to get a fully connected network that is distributed evenly
@@ -318,20 +342,6 @@ import numpy as np
             https://github.com/florimondmanca/pyboids
             where each boid has its own destination
 
-
-    SOURCES:
-
-        https://www.pygame.org/docs/
-
-    OTHER:
-
-    IDEAS:
-
-        if the first neighbor can verify the sender is who they say they are, they can pass on that verification, and then verify they're who THEY say they are, and the 2nd neighbor can verify the same, ... and a path can be built
-
-        what if you used the position triangluation to verify that someone isn't using a server farm to run a bunch of nodes
-        in order for nodes to count they need to be spread out (and moving frequenty? what about desktops) to exibit normal device behavior
-
         '''
 
 
@@ -353,6 +363,7 @@ class View(object):
         # fill background
         self.surface.fill(pygame.Color('black'))
 
+        self.draw_selected_device_range()
         self.draw_in_range_connections()
         # self.draw_pings()
         # self.draw_echos()
@@ -373,6 +384,19 @@ class View(object):
 
         # update display
         pygame.display.update()
+
+    def draw_selected_device_range(self):
+        sd = self.model.selected_device
+        if sd != None:
+            x = int(SCREEN_SCALE * sd.n.x)
+            y = int(SCREEN_SCALE * sd.n.y)
+            r = int(SCREEN_SCALE * R)
+            col = 20 # 0=black, 255=white, we want dark dark gray
+            pygame.draw.circle(
+                self.surface,
+                (col, col, col),
+                (x, y), r)
+
 
     def draw_devices(self):
         for d in model.devices:
@@ -492,9 +516,13 @@ class Model(object):
         # window parameters / drawing
         self.show = True # show current model
 
+        # controller variables
+        self.selected_device = None # device user clicked on
+        self.pause_movement  = False # pause/play movement
+
 
     # main_loop of the model
-    def update(self, controller, verbose=False):
+    def update(self, verbose=False):
 
         t = time.time()
         # if verbose: print('%s\nt = %s' % ('-'*80, t))
@@ -551,44 +579,45 @@ class Model(object):
                             2 has a low chance
 
             '''
-        devices = []
-        num_devices_that_reached_their_dst = 0
-        for d in self.devices:
-            reached_dst = d.move(self.connections[d], verbose=False)
-            if reached_dst:
-                num_devices_that_reached_their_dst += 1
-            else:
-                devices.append(d)
-        while num_devices_that_reached_their_dst > 0:
-            num_devices_that_reached_their_dst -= 1
-            num_devices_left = len(devices)
-            if num_devices_left <= N_MIN:
-                num_devices_to_add = 2
-            elif num_devices_left >= N_MAX:
-                num_devices_to_add = 0
-            else:
-                # print('N_MAX=%d   N_MIN=%d    num_devices_left=%d' % (N_MAX, N_MIN, num_devices_left))
-                a = N_MAX - num_devices_left
-                b = num_devices_left - N_MIN
-                c = N_MAX - N_MIN
-                # print(a, b, c)
-                # print(float(a) / c) # this is larger when were closer to N_MIN
-                # print(float(b) / c) # this is small when were closer to N_MIN
-                p1 = 0.30 # p1 = probability of adding 1 device
-                p0 = (1.00-p1)*(float(b) / c) # p0 = probability of adding 0 devices
-                p2 = (1.00-p1)*(float(a) / c) # p2 = probability of adding 2 devices
-                # print('p0=%.2f   p1=%.2f   p2=%.2f' % (p0, p1, p2))
-                rn = random.uniform(0, 1)
-                if 0.00 <= rn <= p0:    num_devices_to_add = 0
-                if p0    < rn <= p0+p1: num_devices_to_add = 1
-                if p0+p1 < rn <= 1.00:  num_devices_to_add = 2
-                # print('num_devices_to_add = %d' % num_devices_to_add)
-            while num_devices_to_add > 0:
-                num_devices_to_add -= 1
-                devices.append(Device(devices))
+        if not self.pause_movement:
+            devices = []
+            num_devices_that_reached_their_dst = 0
+            for d in self.devices:
+                reached_dst = d.move(self.connections[d], verbose=False)
+                if reached_dst:
+                    num_devices_that_reached_their_dst += 1
+                else:
+                    devices.append(d)
+            while num_devices_that_reached_their_dst > 0:
+                num_devices_that_reached_their_dst -= 1
+                num_devices_left = len(devices)
+                if num_devices_left <= N_MIN:
+                    num_devices_to_add = 2
+                elif num_devices_left >= N_MAX:
+                    num_devices_to_add = 0
+                else:
+                    # print('N_MAX=%d   N_MIN=%d    num_devices_left=%d' % (N_MAX, N_MIN, num_devices_left))
+                    a = N_MAX - num_devices_left
+                    b = num_devices_left - N_MIN
+                    c = N_MAX - N_MIN
+                    # print(a, b, c)
+                    # print(float(a) / c) # this is larger when were closer to N_MIN
+                    # print(float(b) / c) # this is small when were closer to N_MIN
+                    p1 = 0.30 # p1 = probability of adding 1 device
+                    p0 = (1.00-p1)*(float(b) / c) # p0 = probability of adding 0 devices
+                    p2 = (1.00-p1)*(float(a) / c) # p2 = probability of adding 2 devices
+                    # print('p0=%.2f   p1=%.2f   p2=%.2f' % (p0, p1, p2))
+                    rn = random.uniform(0, 1)
+                    if 0.00 <= rn <= p0:    num_devices_to_add = 0
+                    if p0    < rn <= p0+p1: num_devices_to_add = 1
+                    if p0+p1 < rn <= 1.00:  num_devices_to_add = 2
+                    # print('num_devices_to_add = %d' % num_devices_to_add)
+                while num_devices_to_add > 0:
+                    num_devices_to_add -= 1
+                    devices.append(Device(devices))
 
-        self.devices = devices
-        self.connections, self.edges = self.set_connections(self.devices)
+            self.devices = devices
+            self.connections, self.edges = self.set_connections(self.devices)
 
 
         # # update the Nodes in the network every AUTOMATA_PERIOD
@@ -677,42 +706,54 @@ class Model(object):
 
 class Controller(object):
 
-    def __init__(self, model):
+    def __init__(self, model, view):
 
         self.model = model
+        self.view = view
         self.paused = False
 
-    def handle_event(self, event):
+
+    # respond to any user input
+    def handle_event(self, event, verbose=False):
         if event.type != KEYDOWN:
             if event.type == pygame.MOUSEBUTTONDOWN:
 
                 mouse_pos = pygame.mouse.get_pos()
-                print('mouse position = (%d,%d)' % (mouse_pos[0], mouse_pos[1]))
+                mx, my = mouse_pos[0], mouse_pos[1]
+                if verbose: print('mouse position = (%d,%d)' % (mx, my))
 
                 if event.button == 4:
-                    print('mouse wheel scroll up')
+                    if verbose: print('mouse wheel scroll up')
                 elif event.button == 5:
-                    print('mouse wheel scroll down')
+                    if verbose: print('mouse wheel scroll down')
                 elif event.button == 1:
-                    print('mouse left click')
+                    if verbose: print('mouse left click')
+                    self.model.selected_device = self.select_or_deselect_device(mx, my, verbose=True)
+
                 elif event.button == 3:
-                    print('mouse right click')
+                    if verbose: print('mouse right click') # 2 finger click on Mac
                 else:
-                    print('event.button = %d' % event.button)
+                    if verbose: print('event.button = %d' % event.button)
         elif event.key == pygame.K_SPACE:
-            self.paused = not self.paused
+            if verbose: print('space bar')
+            self.model.pause_movement = not self.model.pause_movement
+
         elif event.key == pygame.K_k:
+            if verbose: print('k')
             view.show_controls = not view.show_controls
+
         elif event.key == pygame.K_v:
+            if verbose: print('v')
             view.show_view = not view.show_view
+
         elif event.key == pygame.K_UP:
-            print('up arrow')
+            if verbose: print('up arrow')
         elif event.key == pygame.K_DOWN:
-            print('down arrow')
+            if verbose: print('down arrow')
         elif event.key == pygame.K_LEFT:
-            print('left arrow')
+            if verbose: print('left arrow')
         elif event.key == pygame.K_RIGHT:
-            print('right arrow')
+            if verbose: print('right arrow')
         else: pass
 
         # # another way to do it, gets keys currently pressed
@@ -720,6 +761,35 @@ class Controller(object):
         # if keys[pygame.K_UP]:
         #     pass # etc. ...
 
+    # click unselected device to select it,
+    # click selected device again to deselect it
+    def select_or_deselect_device(self, mx, my, verbose=False):
+        x, y = mx / SCREEN_SCALE, my / SCREEN_SCALE # mx and my are scaled to display, not the model
+        selected_device = self.find_closest_device(x, y, verbose=True)
+        if model.selected_device == None:
+            return selected_device
+        else:
+            if model.selected_device == selected_device:
+                return None
+            else:
+                return selected_device
+
+    # return the device in the model that is currently closest to the point (x, y)
+    def find_closest_device(self, x, y, verbose=False):
+        closest_device = None
+        closest_dist = 5*W # init closest_dist bigger than any possible dist
+        for d in self.model.devices:
+            dist = math.sqrt((x - d.n.x)**2 + (y - d.n.y)**2)
+            if dist < closest_dist:
+                closest_device = d
+                closest_dist = dist
+        if verbose:
+            if closest_device != None:
+                print('closest device to (%.4f, %.4f) is at (%.4f, %.4f)' \
+                    % (x, y, closest_device.n.x, closest_device.n.y))
+            else:
+                print('closest device is None')
+        return closest_device
 
 
 if __name__ == '__main__':
@@ -728,7 +798,7 @@ if __name__ == '__main__':
     pygame.init()
     model = Model()
     view = View(model, show_view=True)
-    controller = Controller(model)
+    controller = Controller(model, view)
 
     # loop variable setup
     running = True
@@ -752,11 +822,10 @@ if __name__ == '__main__':
             if event.type == QUIT:
                 running = False
             else:
-                controller.handle_event(event)
+                controller.handle_event(event, verbose=True)
 
         # update the model
-        if not controller.paused:
-            model.update(controller, verbose=True)
+        model.update(verbose=True)
 
         # display the view
         if view.show_view:
