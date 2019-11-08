@@ -141,7 +141,7 @@ class Node:
 
 		return Message(m, rpk)
 
-	def print_n(self, num_nodes, i='?', start_space='    ', newline_start=False):
+	def print_n(self, num_nodes='?', i='?', start_space='    ', newline_start=False):
 		print('%s%sNode %s out of %s at (%.4f, %.4f)' \
 			% ('\n' if newline_start else '', start_space, i, num_nodes, self.x, self.y))
 

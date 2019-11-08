@@ -18,65 +18,306 @@ import numpy as np
 
     TO DO:
 
-        does anything else need to be done for the devices?
-            clean up other BS
-            make static one
-        do signal stuff until device movement is good
+        NOW:
+
+            do controlss
+                pause movement but not signals
+                    how much faster are the signals simulated paused/unpaused?
+                click on node
+                    view range
+                    view pings, incoming echoes, outgoing/incoming messages
+            do signal stuff
+                make mid_delivery_messages not have a receiver node
+                    if distance between the send_pt and a device is inbetween the
+                    the message distance_travelled before and after this timestep
+                        (where the message dist_travelled is incremented by SIGNAL_SPEED)
+                        then deliver the message to the device
+                            we need to make it somehow account for the fact that if the device
+                            is right on the edge between
+                                d1, dist_travelled, and
+                                d2, dist_travelled + SIGNAL_SPEED
+                            and then it moves from >d2 to <d2, it could receive the signal twice
+                            we also need to make sure the sender_node doesn't receive its own signal
+                                however so long as MAX_VEL of a device is less than the SIGNAL_SPEED,
+                                if we move the devices AND THEN send the message and give the message
+                                a starting dist_travelled of SIGNAL_SPEED then ... idk ...
+                                ... i think the sender_node won't receive the message
+                    if dist_travelled >= R:
+                        delete signal
+
+                draw signals better
+
+                    circles underneath everything else
+
+                    why is there so many echos?
+                        i think each echo is technically to everyone, and its the matching message that specifies who its for
+
+                        make it so the ping
+
+                    make each node have a number in its circle in the display (just its index in the list of all nodes)
+
+                    make it so you can click on a node
+
+                        when you click on a node, information appears about
+                        its public key
+                        its messages list
+
+                        make it so you can toggle viewing that nodes range
+
+                        make it so you can toggle drawing connection lines to this node's direct neighbors
+
+                        make it so you can change R (and maybe other constants) mid simulation
+
+                    make it so you can send a message manually from one node to another
+
+                    make it so you can toggle drawing all connection lines between nodes (dark blue)
+                    make it so pings are sent out as green line segments along the connection line
+                    make it so echos are sent out as red   line segments along the connection line
+
+                    make it so you can toggle drawing messages as expanding circles
+                        pings are dark green circles
+                        echos are dark red circles
+                        messages are dark blue circles
+
+                keep ping the way it was originally made,
+                but increase the speed, and decrease the period
+                because in reality, if they ping/pong back and forth it will take up unnessessary amounts of band width
+                    so doing it on a period is better
+
+        EVENTUALLY:
+
+            model could probably be made faster if we didn't copy over so much data
+                its done to avoid messing up the iteration by deleting during an iteration though
+                    if we could find a way to delete without messing up the iteration,
+                        for lists we could iterate by index and then decrement the index when we delete
+                        what about dictionaries though?
+                            aren't dictionary keys a set in python?
+                                does deleting from a set mess up iterating over it?
+
+            make static map and cellular automata maps
+                figure out how to get a fully connected network that is distributed evenly
+                over the entire area ... more or less
+
+                #################### these need to be fixed ###############################
+
+                    # create devices that are stationary in the map
+                    def init_static_devices(self, verbose=False):
+                        pass
+
+                    # return boolean flagging if ALL the devices form 1 fully connected network
+                    def fully_connected_network(self, devices, connections):
+                        for d, c in connections.items():
+                            if len(c) == 0:
+                                return False
+                        return True
+
+                    # return a list of node networks
+                    def get_networks(self, devices, connections, verbose=False):
+
+                        def get_network_recurrsively(d0, connections, network):
+                            network += [n0]
+                            for c in connections[d0]: # self.set_direct_neighbors(n0, unvisited_nodes):
+                                nd = c.keys[0] # nd = neighboring device
+                                if nd not in network:
+                                    network = get_network_recurrsively(d, connections, network)
+                            return network
+
+                        networks = []
+                        devices = list(filter(lambda d : isinstance(d, Device), devices)) # for cellular automata
+                        unvisited_devices = copy.deepcopy(devices)
+                        while len(unvisited_devices) > 0:
+                            d0 = unvisited_devices[0]
+                            network = get_network_recurrsively(d0, connections, [])
+                            networks.append(network)
+                            for d in network:
+                                unvisited_devices.remove(d)
+
+                        if verbose:
+                            print('\n%d Networks:' % len(networks))
+                            for i, network in enumerate(networks):
+                                print('\nNetwork %d has %d device(s)' % (i+1, len(network)))
+                                for d in network:
+                                    d.print_d()
+
+                        return networks
+
+                    # network 0: N nodes constantly throughout all time steps for the entire simulation
+                    def create_random_network(self, verbose=False):
+
+                        # self.nodes = [Node()]
+                        # while len(self.nodes) < N:
+                        #     n = Node()
+                        #     self.nodes.append(n)
+                        #     if len(self.set_direct_neighbors(n).keys()) == 0:
+                        #         self.nodes.remove(n)
+                        # return self.nodes
+
+                        # self.nodes = [Node() for _ in range(N)]
+                        # while not self.fully_connected_network():
+                        #     print('Fail')
+                        #     self.nodes = [Node() for _ in range(N)]
+                        # if verbose:
+                        #     print('Created network0 of %d nodes' % N)
+                        # return self.nodes
+
+                        nodes = [Node() for _ in range(N)]
+                        connections = self.set_connections(nodes)
+                        networks = self.get_networks(nodes, verbose=verbose)
+                        return nodes, connections
+
+                    # cellular automata
+                    def create_grid_network(self, verbose=False):
+                        # create grid with one node at the center
+                        # nodes = np.array([[Node(x, y) for x in range(W)] for y in range(H)]).flatten().tolist()
+                        nodes = []
+                        for x in range(W):
+                            grid_col = []
+                            for y in range(H):
+                                grid_col.append(
+                                    Node(x, y) if (x, y) in AUTOMATA_START_POSITIONS['one_center'] else str(x)+','+str(y))
+                            nodes += grid_col
+                        if verbose:
+                            for y in range(H):
+                                s = ''
+                                for x in range(W):
+                                    s += ('N' if isinstance(nodes[x*H+y], Node) else '*') + ' '
+                                print(s)
+
+                        connections = self.set_connections(nodes)
+                        # networks = self.get_networks(nodes, verbose=verbose)
+                        return nodes, connections
+                    def evolve_grid(self, verbose=False):
+
+                        def evolve_cell(x0, y0, nodes):
+
+                            # get grid neighbors state
+                            # print('Finding Neighbours (x0, y0) = (%d, %d)' % (x0, y0))
+                            neighbours = []
+                            for x in range(x0-1, x0+2):
+                                for y in range(y0-1, y0+2):
+
+                                    # no wrap around
+                                    if 0 <= x < W and 0 <= y < H:
+                                        if not (x == x0 and y == y0):
+                                            # print('x = %d y = %d   %s' % (x, y, 'ALIVE' if isinstance(nodes[x*H+y], Node) else 'dead'))
+                                            neighbours.append(nodes[x*H+y])
+
+                                    # # wrap around
+                                    # x = W-1 if x == -1 else x
+                                    # x = 0 if x == W else x
+                                    # y = H-1 if y == -1 else y
+                                    # y = 0 if y == H else y
+                                    # if not (x == x0 and y == y0):
+                                    #     print('x = %d y = %d   %s' % (x, y, 'ALIVE' if isinstance(nodes[x*H+y], Node) else 'dead'))
+                                    #     neighbours.append(nodes[x*H+y])
+
+                            # count neighbouring nodes
+
+                            nn = len(list(filter(lambda n : isinstance(n, Node), neighbours)))
+                            # print('nn = %d' % nn)
+
+                            def conways_game_of_life():
+                                cell0 = nodes[x0*H+y0]
+                                dead = str(x0)+','+str(y0)
+                                print('cell0 at (%d, %d)' % (x0, y0))
+                                if isinstance(cell0, Node):
+                                    print('ALIVE')
+                                    if nn < 2: # Death by isolation
+                                        print('Death by isolation')
+                                        return dead
+                                    elif 1 < nn < 4: # Survival
+                                        print('Survival')
+                                        return cell0
+                                    elif 3 < nn: # Death by overcrowding
+                                        print('Death by overcrowding')
+                                        return dead
+                                else: # cell0 == None
+                                    print('dead')
+                                    if nn == 3: # Births
+                                        print('birth')
+                                        return Node(x0, y0)
+                                    else:
+                                        print('stay dead')
+                                        return dead
+                            def forest_fire():
+                                cell0 = nodes[x0*H+y0]
+                                empty   = str(x0)+','+str(y0)
+                                burning = empty + ' burning'
+                                print('cell0 at (%d, %d)' % (x0, y0))
+                                if isinstance(cell0, Node):
+                                    print('tree')
+                                    if nn < 0: # A tree will burn if at least one neighbor is burning
+                                        print('tree will burn if at least one neighbor is burning')
+                                        return burning
+                                    else:
+                                        # A tree ignites with probability F even if no neighbor is burning
+                                        return cell0 if random.uniform(0, 1) <= F else burning
+                                else: # not a tree
+                                    if cell0.endswith(' burning'): # A burning cell turns into an empty cell
+                                        print('burning')
+                                        return empty
+                                    else: # An empty space fills with a tree with probability p
+                                        print('empty')
+                                        return Node(x0, y0) if random.uniform(0, 1) <= P else cell0
+                            def forest():
+                                cell0 = nodes[x0*H+y0]
+                                empty = str(x0)+','+str(y0)
+                                pn = float(nn/8) # percent neighbors
+                                if isinstance(cell0, Node): # tree
+                                    # the more trees there are around a tree,
+                                    # the more likely the tree will die (become an empty space)
+                                    # a tree will not die if it has no neighbours
+                                    return cell0 if nn == 0 or random.uniform(0, 1) <= 1.00 - pn*percent_trees else empty
+
+                                else: # empty
+                                    # a tree can only grow if there is at least 1 neighbor
+                                    # the less nn there are around an empty space the more likely a tree will grow
+                                    # nn: min=0, max=8
+                                    # probablility: min=0, max=100
+                                    # if few  neighbors: high likelyhood
+                                    # if many neighbors: low  likelyhood 8n 1/9 p
+                                    return Node(x0, y0) if nn > 0 and random.uniform(0, 1) <= 1.00 - pn*percent_trees else empty
+
+                            return forest()
+
+                        # for forest growth
+                        num_trees = len(list(filter(lambda n :     isinstance(n, Node), self.nodes)))
+                        num_empty = len(list(filter(lambda n : not isinstance(n, Node), self.nodes)))
+                        percent_trees = float(num_trees) / num_empty
+
+                        nodes = []
+                        for x in range(W):
+                            for y in range(H):
+                                # print()
+                                nodes.append(evolve_cell(x, y, self.nodes))
+
+                        # ensure we never delete all the nodes
+                        if nodes:
+                            non_empty_nodes = []
+                            for n in self.nodes:
+                                if isinstance(n, Node):
+                                    non_empty_nodes.append(n)
+                        nodes = [non_empty_nodes[random.randint(len(non_empty_nodes))]] if nodes == [] else nodes
+
+                        self.nodes = nodes
+                        self.connections = self.set_connections(self.nodes)
+
+                        if verbose:
+                            print('Grid Evolution')
+                            for y in range(H):
+                                s = ''
+                                for x in range(W):
+                                    s += ('N' if isinstance(self.nodes[x*H+y], Node) else '*') + ' '
+                                print(s)
+                            print('------------------------------------------------------')
+
+                ###########################################################################
 
 
-
-        keep ping the way it was originally made,
-        but increase the speed, and decrease the period
-        because in reality, if they ping/pong back and forth it will take up unnessessary amounts of band width
-
-
-            maybe use this
+            maybe use this to improve device movement
             https://github.com/florimondmanca/pyboids
             where each boid has its own destination
 
-
-
-        display:
-
-            why is there so many echos?
-                i think each echo is technically to everyone, and its the matching message that specifies who its for
-
-                make it so the ping
-
-            make it so dark blue circle outline that emits from each node to represent sending a message
-            draw
-
-            make each node have a number in its circle in the display (just its index in the list of all nodes)
-
-            make it so you can click on a node
-
-                when you click on a node, information appears about
-                its public key
-                its messages list
-
-                make it so you can toggle viewing that nodes range
-
-                make it so you can toggle drawing connection lines to this node's direct neighbors
-
-                make it so you can change R (and maybe other constants) mid simulation
-
-            make it so you can send a message manually from one node to another
-
-            make it so you can toggle drawing all connection lines between nodes (dark blue)
-            make it so pings are sent out as green line segments along the connection line
-            make it so echos are sent out as red   line segments along the connection line
-
-            make it so you can toggle drawing messages as expanding circles
-                pings are dark green circles
-                echos are dark red circles
-                messages are dark blue circles
-
-            maybe make messages of all kinds fade as they get farther away
-
-
-        see create_network0
-            figure out how to get a fully connected network that is distributed evenly
-            over the entire area ... more or less
 
     SOURCES:
 
@@ -95,8 +336,7 @@ import numpy as np
 
 
 
-class PyGameView(object):
-
+class View(object):
 
     def __init__(self, model, show_view=True):
 
@@ -107,6 +347,32 @@ class PyGameView(object):
         self.show_view = show_view # toggle display
         self.show_controls = False # toggle control display
 
+
+    def draw(self):
+
+        # fill background
+        self.surface.fill(pygame.Color('black'))
+
+        self.draw_in_range_connections()
+        # self.draw_pings()
+        # self.draw_echos()
+        # self.draw_messages()
+        # self.draw_paths_to_dst()
+        self.draw_devices()
+
+        # # example shapes
+        # pygame.draw.circle(self.surface, pygame.Color('green'), (250,250), 10) # (x,y), radius
+        # pygame.draw.line(self.surface,   (255,255,255), (310, 320), (330, 340), 4) # (start_x, start_y), (end_x, end_y), thickness
+        # pygame.draw.rect(self.surface,   pygame.Color('red'), [300, 350, 40, 100]) # [x,y,width,height]
+
+        # # draw control key
+        # if self.show_controls:
+        #     for n, line in enumerate(CONTROL_KEY):
+        #         self.draw_text(line, 10, 50+14*n, 20)
+        # #else: self.draw_text("h = toggle help", 30, 1, 20)
+
+        # update display
+        pygame.display.update()
 
     def draw_devices(self):
         for d in model.devices:
@@ -189,32 +455,6 @@ class PyGameView(object):
                 self.draw_message_circle(mdm, 'cyan', fade=True)
                 self.draw_message_dot(mdm, 'cyan')
 
-    def draw(self):
-
-        # fill background
-        self.surface.fill(pygame.Color('black'))
-
-        self.draw_in_range_connections()
-        # self.draw_pings()
-        # self.draw_echos()
-        # self.draw_messages()
-        # self.draw_paths_to_dst()
-        self.draw_devices()
-
-        # # example shapes
-        # pygame.draw.circle(self.surface, pygame.Color('green'), (250,250), 10) # (x,y), radius
-        # pygame.draw.line(self.surface,   (255,255,255), (310, 320), (330, 340), 4) # (start_x, start_y), (end_x, end_y), thickness
-        # pygame.draw.rect(self.surface,   pygame.Color('red'), [300, 350, 40, 100]) # [x,y,width,height]
-
-        # # draw control key
-        # if self.show_controls:
-        #     for n, line in enumerate(CONTROL_KEY):
-        #         self.draw_text(line, 10, 50+14*n, 20)
-        # #else: self.draw_text("h = toggle help", 30, 1, 20)
-
-        # update display
-        pygame.display.update()
-
     def draw_text(self, text, x, y, size, \
         text_color = (100, 100, 100), \
         background_color = (0, 0, 0)):
@@ -236,18 +476,10 @@ class PyGameView(object):
 class Model(object):
 
     def __init__(self):
-        '''
-            initialize model, environment, and default keyboard controller states
-        Args:
-            width (int): width of window in pixels
-            height (int): height of window in pixels
-        '''
 
-        # create network
-        # self.nodes, self.connections = self.create_random_network(verbose=True)
-        # self.nodes, self.connections = self.create_grid_network(verbose=True)
-        self.devices = self.create_variable_network(verbose=True)
-        self.connections, self.edges = self.set_connections(self.devices, verbose=True)
+        # create devices
+        self.devices = self.init_moving_devices(verbose=False)
+        self.connections, self.edges = self.set_connections(self.devices, verbose=False)
 
         # list of messages that are being delivered. Used just for time delay in simulation
         # format: [(receiver_node, delivery_time, message), ...]
@@ -260,10 +492,12 @@ class Model(object):
         # window parameters / drawing
         self.show = True # show current model
 
+
+    # main_loop of the model
     def update(self, controller, verbose=False):
 
         t = time.time()
-        if verbose: print('%s\nt = %s' % ('-'*80, t))
+        # if verbose: print('%s\nt = %s' % ('-'*80, t))
 
         # # move message signals forward,
         # # deliver message if it's reached the receiver_node,
@@ -294,7 +528,7 @@ class Model(object):
         #     for m in sent_messages:
         #         self.add_message_to_mid_delivery_messages(m, d)
 
-        ''' move the devices, and update devices, connections and edges 
+        ''' move the devices, and update devices, connections and edges
 
             there are a variable number of nodes on the map at any given time
                 ranging from N_MIN to N_MAX
@@ -320,7 +554,7 @@ class Model(object):
         devices = []
         num_devices_that_reached_their_dst = 0
         for d in self.devices:
-            reached_dst = d.move(self.connections[d], verbose=True)
+            reached_dst = d.move(self.connections[d], verbose=False)
             if reached_dst:
                 num_devices_that_reached_their_dst += 1
             else:
@@ -352,7 +586,7 @@ class Model(object):
             while num_devices_to_add > 0:
                 num_devices_to_add -= 1
                 devices.append(Device(devices))
-                
+
         self.devices = devices
         self.connections, self.edges = self.set_connections(self.devices)
 
@@ -367,8 +601,10 @@ class Model(object):
         #    input()
         # sys.exit()
 
+    # determine which devices are current within signal range of each other
+    # {keys=devices, value={key=neighbor_device : value=distance}}
     def set_connections(self, devices, verbose=False):
-        connections = {} # {keys=devices, value={key=neighbor_device, value=distance}}
+        connections = {} # {keys=devices : value={key=neighbor_device, value=distance}}
         edges = []
         for d0 in devices:
             if not isinstance(d0, Device): continue
@@ -383,23 +619,25 @@ class Model(object):
             num_devices = len(devices)
             for i, (d0, neighbors) in enumerate(connections.items()):
                 print()
-                d0.print_d(num_devices, i=i+1)
+                d0.print_d(num_devices=num_devices, i=i+1)
                 num_neighbors = len(neighbors)
                 print('    has %d direct neighbor(s)' % num_neighbors)
                 if num_neighbors > 0:
                     for j, neighbor in enumerate(neighbors):
-                        neighbor.print_d(num_neighbors, i=j+1, start_space='        ')
+                        neighbor.print_d(num_devices=num_neighbors, i=j+1, start_space='        ')
             print('\n%d Edges:' % len(edges))
             for i, edge in enumerate(edges):
                 print('   edge %d' % (i+1))
-                edge[0].print_d(2, i=1, start_space='        ')
-                edge[1].print_d(2, i=2, start_space='        ')
+                edge[0].print_d(num_devices=2, i=1, start_space='        ')
+                edge[1].print_d(num_devices=2, i=2, start_space='        ')
                 print()
             print()
         return connections, edges
 
+    # determine which devices are within signal range of device d0
+    # {key=neighboring device : value=distance}
     def set_direct_neighbors(self, d0, devices, verbose=False):
-        neighbors = {} # key = neighboring device, value = distance
+        neighbors = {} # {key = neighboring device : value = distance}
         for d in devices:
             if not isinstance(d0, Device): continue
             if d != d0:
@@ -411,6 +649,7 @@ class Model(object):
             for neighbor in neighbors.keys(): neighbor.print_d(newline_start=False)
         return neighbors
 
+    # put message from device d0 in list of messages that are mid-delivery
     def add_message_to_mid_delivery_messages(self, message, d0):
         for neighbor, dist in self.connections[d0].items():
             self.mid_delivery_messages.append({
@@ -421,7 +660,8 @@ class Model(object):
                 'message'          : message
             })
 
-    def create_variable_network(self, verbose=False):
+    # create devices that move around the map
+    def init_moving_devices(self, verbose=False):
         devices = []
         n_to_create = int(((N_MAX - N_MIN) / 2) + N_MIN) # create halfway between N_MIN and N_MAX
         while n_to_create > 0:
@@ -433,223 +673,14 @@ class Model(object):
             for i, d in enumerate(devices):
                 d.print_d(num_devices, i=i+1)
         return devices
-    def get_num_nodes_to_create(self):
-        current_num_nodes = len(self.nodes)
-        min_nodes_possible_to_create = max(N_MIN - current_num_nodes, N_CREATE_MIN)
-        max_nodes_possible_to_create = min(N_MAX - current_num_nodes, N_CREATE_MAX)
-        return random.uniform(min_nodes_possible_to_create, max_nodes_possible_to_create)
 
 
-    def fully_connected_network(self):
-        for n in self.nodes:
-            neighbors = self.set_direct_neighbors(n)
-            if len(neighbors.keys()) == 0:
-                return False
-        return True
-    # return a list of node networks
-    def get_networks(self, nodes, verbose=False):
+class Controller(object):
 
-        def get_network_recurrsively(n0, network):
-            network += [n0]
-            for n in self.set_direct_neighbors(n0, unvisited_nodes):
-                if n not in network:
-                    network = get_network_recurrsively(n, network)
-            return network
+    def __init__(self, model):
 
-        networks = []
-        nodes = list(filter(lambda n : isinstance(n, Node), nodes)) # for cellular automata
-        unvisited_nodes = copy.deepcopy(nodes)
-        while len(unvisited_nodes) > 0:
-            n0 = unvisited_nodes[0]
-            network = get_network_recurrsively(n0, [])
-            networks.append(network)
-            for n in network:
-                unvisited_nodes.remove(n)
-
-        if verbose:
-            print('\n%d Networks:' % len(networks))
-            for i, network in enumerate(networks):
-                print('\nNetwork %d has %d node(s)' % (i+1, len(network)))
-                for n in network:
-                    n.print_n()
-
-        return networks
-    # network 0: N nodes constantly throughout all time steps for the entire simulation
-    def create_random_network(self, verbose=False):
-        nodes = [Node() for _ in range(N)]
-        connections = self.set_connections(nodes)
-        networks = self.get_networks(nodes, verbose=verbose)
-        return nodes, connections
-    # def create_network0(self, verbose=False):
-    #     self.nodes = [Node()]
-    #     while len(self.nodes) < N:
-    #         n = Node()
-    #         self.nodes.append(n)
-    #         if len(self.set_direct_neighbors(n).keys()) == 0:
-    #             self.nodes.remove(n)
-    #     return self.nodes
-    # def create_network0(self, verbose=False):
-    #     self.nodes = [Node() for _ in range(N)]
-    #     while not self.fully_connected_network():
-    #         print('Fail')
-    #         self.nodes = [Node() for _ in range(N)]
-    #     if verbose:
-    #         print('Created network0 of %d nodes' % N)
-    #     return self.nodes
-
-    # cellular automata
-    def create_grid_network(self, verbose=False):
-        # create grid with one node at the center
-        # nodes = np.array([[Node(x, y) for x in range(W)] for y in range(H)]).flatten().tolist()
-        nodes = []
-        for x in range(W):
-            grid_col = []
-            for y in range(H):
-                grid_col.append(
-                    Node(x, y) if (x, y) in AUTOMATA_START_POSITIONS['one_center'] else str(x)+','+str(y))
-            nodes += grid_col
-        if verbose:
-            for y in range(H):
-                s = ''
-                for x in range(W):
-                    s += ('N' if isinstance(nodes[x*H+y], Node) else '*') + ' '
-                print(s)
-
-        connections = self.set_connections(nodes)
-        # networks = self.get_networks(nodes, verbose=verbose)
-        return nodes, connections
-    def evolve_grid(self, verbose=False):
-
-        def evolve_cell(x0, y0, nodes):
-
-            # get grid neighbors state
-            # print('Finding Neighbours (x0, y0) = (%d, %d)' % (x0, y0))
-            neighbours = []
-            for x in range(x0-1, x0+2):
-                for y in range(y0-1, y0+2):
-
-                    # no wrap around
-                    if 0 <= x < W and 0 <= y < H:
-                        if not (x == x0 and y == y0):
-                            # print('x = %d y = %d   %s' % (x, y, 'ALIVE' if isinstance(nodes[x*H+y], Node) else 'dead'))
-                            neighbours.append(nodes[x*H+y])
-
-                    # # wrap around
-                    # x = W-1 if x == -1 else x
-                    # x = 0 if x == W else x
-                    # y = H-1 if y == -1 else y
-                    # y = 0 if y == H else y
-                    # if not (x == x0 and y == y0):
-                    #     print('x = %d y = %d   %s' % (x, y, 'ALIVE' if isinstance(nodes[x*H+y], Node) else 'dead'))
-                    #     neighbours.append(nodes[x*H+y])
-
-            # count neighbouring nodes
-
-            nn = len(list(filter(lambda n : isinstance(n, Node), neighbours)))
-            # print('nn = %d' % nn)
-
-            def conways_game_of_life():
-                cell0 = nodes[x0*H+y0]
-                dead = str(x0)+','+str(y0)
-                print('cell0 at (%d, %d)' % (x0, y0))
-                if isinstance(cell0, Node):
-                    print('ALIVE')
-                    if nn < 2: # Death by isolation
-                        print('Death by isolation')
-                        return dead
-                    elif 1 < nn < 4: # Survival
-                        print('Survival')
-                        return cell0
-                    elif 3 < nn: # Death by overcrowding
-                        print('Death by overcrowding')
-                        return dead
-                else: # cell0 == None
-                    print('dead')
-                    if nn == 3: # Births
-                        print('birth')
-                        return Node(x0, y0)
-                    else:
-                        print('stay dead')
-                        return dead
-            def forest_fire():
-                cell0 = nodes[x0*H+y0]
-                empty   = str(x0)+','+str(y0)
-                burning = empty + ' burning'
-                print('cell0 at (%d, %d)' % (x0, y0))
-                if isinstance(cell0, Node):
-                    print('tree')
-                    if nn < 0: # A tree will burn if at least one neighbor is burning
-                        print('tree will burn if at least one neighbor is burning')
-                        return burning
-                    else:
-                        # A tree ignites with probability F even if no neighbor is burning
-                        return cell0 if random.uniform(0, 1) <= F else burning
-                else: # not a tree
-                    if cell0.endswith(' burning'): # A burning cell turns into an empty cell
-                        print('burning')
-                        return empty
-                    else: # An empty space fills with a tree with probability p
-                        print('empty')
-                        return Node(x0, y0) if random.uniform(0, 1) <= P else cell0
-            def forest():
-                cell0 = nodes[x0*H+y0]
-                empty = str(x0)+','+str(y0)
-                pn = float(nn/8) # percent neighbors
-                if isinstance(cell0, Node): # tree
-                    # the more trees there are around a tree,
-                    # the more likely the tree will die (become an empty space)
-                    # a tree will not die if it has no neighbours
-                    return cell0 if nn == 0 or random.uniform(0, 1) <= 1.00 - pn*percent_trees else empty
-
-                else: # empty
-                    # a tree can only grow if there is at least 1 neighbor
-                    # the less nn there are around an empty space the more likely a tree will grow
-                    # nn: min=0, max=8
-                    # probablility: min=0, max=100
-                    # if few  neighbors: high likelyhood
-                    # if many neighbors: low  likelyhood 8n 1/9 p
-                    return Node(x0, y0) if nn > 0 and random.uniform(0, 1) <= 1.00 - pn*percent_trees else empty
-
-            return forest()
-
-        # for forest growth
-        num_trees = len(list(filter(lambda n :     isinstance(n, Node), self.nodes)))
-        num_empty = len(list(filter(lambda n : not isinstance(n, Node), self.nodes)))
-        percent_trees = float(num_trees) / num_empty
-
-        nodes = []
-        for x in range(W):
-            for y in range(H):
-                # print()
-                nodes.append(evolve_cell(x, y, self.nodes))
-
-        # ensure we never delete all the nodes
-        if nodes:
-            non_empty_nodes = []
-            for n in self.nodes:
-                if isinstance(n, Node):
-                    non_empty_nodes.append(n)
-        nodes = [non_empty_nodes[random.randint(len(non_empty_nodes))]] if nodes == [] else nodes
-
-        self.nodes = nodes
-        self.connections = self.set_connections(self.nodes)
-
-        if verbose:
-            print('Grid Evolution')
-            for y in range(H):
-                s = ''
-                for x in range(W):
-                    s += ('N' if isinstance(self.nodes[x*H+y], Node) else '*') + ' '
-                print(s)
-            print('------------------------------------------------------')
-
-
-class PyGameKeyboardController(object):
-
-    def __init__(self):
-
+        self.model = model
         self.paused = False
-
 
     def handle_event(self, event):
         if event.type != KEYDOWN:
@@ -684,10 +715,10 @@ class PyGameKeyboardController(object):
             print('right arrow')
         else: pass
 
-        # another way to do it, gets keys currently pressed
-        keys = pygame.key.get_pressed()  # checking pressed keys
-        if keys[pygame.K_UP]:
-            pass # etc. ...
+        # # another way to do it, gets keys currently pressed
+        # keys = pygame.key.get_pressed()  # checking pressed keys
+        # if keys[pygame.K_UP]:
+        #     pass # etc. ...
 
 
 
@@ -696,8 +727,8 @@ if __name__ == '__main__':
     # pygame setup
     pygame.init()
     model = Model()
-    view = PyGameView(model, show_view=True)
-    controller = PyGameKeyboardController()
+    view = View(model, show_view=True)
+    controller = Controller(model)
 
     # loop variable setup
     running = True

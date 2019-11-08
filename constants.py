@@ -4,73 +4,55 @@ import string
 
 
 
-# # random network: specified number of sub-networks with a specified number of nodes constantly throughout all time steps for the entire simulation
+# # TODO: static network
+# GRID = True # flag to put the nodes in a grid or not
 # SUB_NETWORKS = [
-#     20
-# ] # NETWORKS = list of number of nodes in each sub network (fully connected), len(NETWORKS) = number of networks
-# N = sum(NETWORKS) # number of nodes in the network
-# R = 5 # max signal radius of each node
-# # coordinate range of 2D rectangular map
-# X_MIN, X_MAX = 0.00, 25.00
-# Y_MIN, Y_MAX = 0.00, 25.00
-# NODE_POSITIONS =
-#     nodes = [Node(0, 0)]
-#     n0 = nodes[0]
-#     while num_nodes in NETWORKS:
-#         # create starting node n0 at a position (0, 0)
-#         # pick a random distance from .05*R to R
-#         # pick a random direction from 0 to 2*math.pi
-#         # create a node that direction and distance away from the previous node created
-#         #     (verify its inbounds w/ no coordinate wrap around)
-#         # n0 = n
+#     2,
+#     5,
+#     1,
+#     9
+# ] # list of number of nodes in each sub network (fully connected), len(NETWORKS) = number of networks
+# N = sum(SUB_NETWORKS)
+# SCREEN_SCALE = 10.0 # make SCREENSIZE SCREEN_SCALE times as big as coordinate range of 2D rectangular map
+# SCREEN_SIZE = (
+#     int(SCREEN_SCALE * W),
+#     int(SCREEN_SCALE * H)
+# )
 
 
-# # grid network: N nodes at each point in a W by H grid, N=W*H, R = dist so neighbors in grid are neighbors in network
-# W = 20 # width of grid
-# H = 20 # height of grid
-# N = W * H # number of nodes in the network
-# R = 1 * math.sqrt(2) # max signal radius of each node
-# # coordinate range of 2D rectangular map
-# X_MIN, X_MAX = 0.00, float(W)
-# Y_MIN, Y_MAX = 0.00, float(H)
-# SCREEN_SCALE = 20.0 # make SCREENSIZE SCREEN_SCALE times as big as coordinate range of 2D rectangular map
-
-# variable network
-W = 20
-H = 20
-N_MIN, N_MAX = 10, 20
-AVG_VEL = 0.01
-STD_DEV_VEL = 0.001
-MAX_VEL = AVG_VEL + 3*STD_DEV_VEL
-MIN_VEL = AVG_VEL - 3*STD_DEV_VEL
-absolute_min_vel = 0.00001
-if MIN_VEL < absolute_min_vel: MIN_VEL = absolute_min_vel
-MAX_DST_DIST = 0.01 # max distance from node's destination to count as reaching the destination
-R = 5.0
-
-SCREEN_SCALE = 25.0 # make SCREENSIZE SCREEN_SCALE times as big as coordinate range of 2D rectangular map
+# VARIABLE NETWORK
+W = 20 # width of model's 2D map
+H = 20 # height of model's 2D map
+N_MIN, N_MAX = 10, 20 # min/max number of devices on the map at any point in time
+AVG_VEL = 0.01 # average velocity of a device
+STD_DEV_VEL = 0.001 # standard deviation of device velocity
+MAX_VEL = AVG_VEL + 3*STD_DEV_VEL # max device velocity
+MIN_VEL = AVG_VEL - 3*STD_DEV_VEL # min device velocity
+MIN_VEL = max(MIN_VEL, 0.00001) # ensure MIN_VEL is always positive
+MAX_DST_DIST = 0.01 # max distance from device to destination that qualifies as reaching the destination
+R = 5.0 # signal radius range of a device to connect to other devices (to send/receive messages)
+SCREEN_SCALE = 25.0 # pixels per unit, aka make the SCREENSIZE SCREEN_SCALE times as big as coordinate range of the 2D map
 SCREEN_SIZE = (
     int(SCREEN_SCALE * W),
     int(SCREEN_SCALE * H)
-)
+) # pixel dimentions of display screen
 
 
 
-SIGNAL_SPEED = 3.5 # how far the signal travels per second
+SIGNAL_SPEED = 3.5 # how far the signal travels per second (make sure this is faster than MAX_VEL)
 PING_FREQUENCY = 0.5 # number of pings per second
 
 
-# coordinate range of 3D globe
-# pass
 
-ALL_CHARS = ''.join(set(string.printable) - set(string.whitespace)) # all printable characters except white space
+
+ALL_CHARS = ''.join(set(string.printable) - set(string.whitespace)) # all printable characters except white space, used for key creation
 # source: https://docs.python.org/3/library/string.html
 
 
 
 
 
-OUTPUT_FRAME_RATE = False
+OUTPUT_FRAME_RATE = False # flag if we want to print the frame rate to the console
 
 CONTROL_KEY = [
 	"Keyboard Controls:",

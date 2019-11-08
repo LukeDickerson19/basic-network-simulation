@@ -114,6 +114,5 @@ class Device(object):
         if self.n.y > W: self.n.y = H
         return self.reached_dst()
 
-
-    def print_d(self, num_devices, i='?', start_space='    ', newline_start=False):
-        self.n.print_n(num_devices, i=i, start_space=start_space, newline_start=newline_start)
+    def print_d(self, num_devices='?', i='?', start_space='    ', newline_start=False):
+        self.n.print_n(num_nodes=num_devices, i=i, start_space=start_space, newline_start=newline_start)
