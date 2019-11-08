@@ -9,93 +9,31 @@ import random
 from pygame.locals import QUIT, KEYDOWN
 from constants import *
 from node import Node
+from device import Device
 from message import Message
 import numpy as np
+
 
 ''' NOTES:
 
     TO DO:
 
-        add verbose statements to update and use them to debug it, then debug display
+        does anything else need to be done for the devices?
+            clean up other BS
+            make static one
+        do signal stuff until device movement is good
+
+
 
         keep ping the way it was originally made,
         but increase the speed, and decrease the period
         because in reality, if they ping/pong back and forth it will take up unnessessary amounts of band width
-
-        make each node has a start and stop point
-            they're born at point A (random location)
-            they move to point B (random location)
-                avoiding other nodes along the way (not nessessary)
-            then they die at point B
-
-            could this achieve networks:
-                growing
-                shrinking
-                splitting
-                merging
-
-            variable number of nodes
-            theres a minimum number and a max
-            initially create halfway between
-            when a node n0 reaches its destination dst
-                create 0, 1 or 2 nodes
-                    if there was N_MIN nodes before n0 reached its dst
-                        create 2
-                    elif there was N_MAX nodes before n0 reached its dst
-                        create 0
-                    else:
-                        random([0, 1, 2])
-                        # near N_MIN
-                            0 low chance
-                            1 medium chance
-                            2 high chance
-                        # near N_MAX
-                            0 high chance
-                            1 medium chance
-                            2 low chance
-
-
-            for each node:
-                v0 = get vector to dest
-                v = v0
-                for close nodes cn
-                    get angle to node
-                    get opposite angle
-                    vect_magnitude by their closeness (1 / dist)
-                    vector sum to v
-
-                make velocity like 1 pixel or very small so
-                if a node is surrounded by a bunch of nodes and its vector sum pushes it into a node
-                it will be closer the next time but not NEAR at all colliding and now that its closer
-                its new vector sum will push it away from the node its getting closer to colliding with
-
-                each message will need a sent_pos = (x, y) to exand from where it was sent originally
 
 
             maybe use this
             https://github.com/florimondmanca/pyboids
             where each boid has its own destination
 
-
-
-
-        i need a cellular automata that has
-            nodes constantly joining and leaving the network
-            networks constantly growing, shrinking, splitting and merging
-
-            HOWEVER:
-                when a node joins, it joins a network. It does not try to start its own network
-
-                8 sournding squares
-                if im 1:
-                    if 7 or more of my neighboring squares is 1, i turn to 0
-                    if
-
-                if im 0:
-
-        then do create_random_network
-            see constants.py
-            fixed number of nodes in a specifed
 
 
         display:
@@ -156,10 +94,9 @@ import numpy as np
         '''
 
 
+
 class PyGameView(object):
-    '''
-        PyGameView controls the display
-    '''
+
 
     def __init__(self, model, show_view=True):
 
@@ -189,6 +126,19 @@ class PyGameView(object):
                 self.surface,
                 pygame.Color('blue'),
                 (x1, y1), (x2, y2), 1)
+
+    def draw_paths_to_dst(self):
+        for d in self.model.devices:
+            x1, y1 = int(SCREEN_SCALE * d.n.x),    int(SCREEN_SCALE * d.n.y)
+            x2, y2 = int(SCREEN_SCALE * d.dst[0]), int(SCREEN_SCALE * d.dst[1])
+            pygame.draw.line(
+                self.surface,
+                (255,255,255),
+                (x1, y1), (x2, y2), 1) # (start_x, start_y), (end_x, end_y), thickness
+            pygame.draw.circle(
+                self.surface,
+                (255,0,0),
+                (x2, y2), 5) # (x,y), radius
 
     def draw_message_dot(self, mdm, color):
         sn, rn = mdm['sender_device'].n, mdm['receiver_device'].n
@@ -245,9 +195,10 @@ class PyGameView(object):
         self.surface.fill(pygame.Color('black'))
 
         self.draw_in_range_connections()
-        self.draw_pings()
-        self.draw_echos()
+        # self.draw_pings()
+        # self.draw_echos()
         # self.draw_messages()
+        # self.draw_paths_to_dst()
         self.draw_devices()
 
         # # example shapes
@@ -282,70 +233,6 @@ class PyGameView(object):
         self.surface.blit(text_render, (x, y))
 
 
-class Device(object):
-
-    def __init__(self, devices):
-
-        self.src, self.dst = self.set_source_and_destination(devices)
-        self.vel = self.set_velocity()
-        # print('src = (%.4f, %.4f)' % (self.src[0], self.src[1]))
-        self.n = Node(self.src[0], self.src[1], grid=False)
-
-    def set_source_and_destination(self, devices):
-
-        # pick a random side
-        sides = ['left', 'right', 'top', 'bottom']
-        src_side = random.choice(sides)
-
-        # pick a portion of the side that no other node is at
-        src = None
-        while src == None:
-            if src_side == 'left':   src = (0, H * random.uniform(0, 1))
-            if src_side == 'right':  src = (W, H * random.uniform(0, 1))
-            if src_side == 'top':    src = (W * random.uniform(0, 1), H)
-            if src_side == 'bottom': src = (W * random.uniform(0, 1), 0)
-            for d in devices:
-                if d.n.x == src[0] and d.n.y == src[1]:
-                    src = None
-                    break
-
-        # pick a random other side
-        sides.remove(src_side)
-        dst_side = random.choice(sides)
-
-        # pick a portion of that other side
-        if dst_side == 'left':   dst = (0, H * random.uniform(0, 1))
-        if dst_side == 'right':  dst = (W, H * random.uniform(0, 1))
-        if dst_side == 'top':    dst = (W * random.uniform(0, 1), H)
-        if dst_side == 'bottom': dst = (W * random.uniform(0, 1), 0)
-
-        return src, dst
-
-    def set_velocity(self):
-        vel = random.gauss(AVG_VEL, STD_DEV_VEL) # normal distribution
-        vel = MIN_VEL if vel < MIN_VEL else vel
-        vel = MAX_VEL if vel > MAX_VEL else vel
-        return vel
-
-    def move(self, close_devices):
-        x, y = self.n.x, self.n.y
-        dx, dy = x-self.dst[0], y-self.dst[1] # x and y dist to dst
-        dst_dist = math.sqrt(dx**2 + dy**2) # distance to destination
-        theta0 = np.arctan2(dx, dy) # v0 = angle to dst
-        mag = min(self.vel, dst_dist)
-        v0 = (mag * np.cos(theta0), mag * np.sin(theta0)) # v0 = vector to destination
-        v_sum = v0
-        for d, dist in close_devices.items():
-            theta = np.arctan2(x-d.n.x, y-d.n.y) + np.pi
-            mag = float(1 / dist)
-            v = (mag * np.cos(theta0), mag * np.sin(theta0)) # v0 = vector to destination
-            v_sum = (v_sum[0] + v[0], v_sum[1] + v[1])
-        self.n.x += v_sum[0]
-        self.n.y += v_sum[1]
-
-    def print_d(self, num_devices, i='?', start_space='    ', newline_start=False):
-        self.n.print_n(num_devices, i=i, start_space=start_space, newline_start=newline_start)
-
 class Model(object):
 
     def __init__(self):
@@ -373,43 +260,100 @@ class Model(object):
         # window parameters / drawing
         self.show = True # show current model
 
-    def update(self, controller):
+    def update(self, controller, verbose=False):
 
-        # move message signals forward,
-        # deliver message if it's reached the receiver_node,
-        # else keep it in the mid_delivery_messages list
         t = time.time()
-        new_mid_delivery_messages = []
-        for mdm in self.mid_delivery_messages:
-            mdm['dist_traveled'] += (SIGNAL_SPEED * (t - self.t1))
-            sp, rn = mdm['send_pt'], mdm['receiver_device'].n
-            dist_send_pt_to_rn = math.sqrt((sp[0] - rn.x)**2 + (sp[1] - rn.y)**2)
-            if mdm['dist_traveled'] >= dist_send_pt_to_rn: # reached receiver device
-                rd = d['receiver_device']
-                m  = d['message']
-                rd.n.messages.append(m)
-            else:
-                new_mid_delivery_messages.append(mdm)
-        self.mid_delivery_messages = new_mid_delivery_messages
+        if verbose: print('%s\nt = %s' % ('-'*80, t))
 
-        # run the main loop of each node
-        for i, d in enumerate(self.devices):
+        # # move message signals forward,
+        # # deliver message if it's reached the receiver_node,
+        # # else keep it in the mid_delivery_messages list
+        # new_mid_delivery_messages = []
+        # for mdm in self.mid_delivery_messages:
+        #     mdm['dist_traveled'] += (SIGNAL_SPEED * (t - self.t1))
+        #     sp, rn = mdm['send_pt'], mdm['receiver_device'].n
+        #     dist_send_pt_to_rn = math.sqrt((sp[0] - rn.x)**2 + (sp[1] - rn.y)**2)
+        #     if mdm['dist_traveled'] >= dist_send_pt_to_rn: # reached receiver device
+        #         rn.messages.append(mdm['message'])
+        #     else:
+        #         new_mid_delivery_messages.append(mdm)
+        # self.mid_delivery_messages = new_mid_delivery_messages
 
-            if not isinstance(d, Device): continue
+        # # run the main loop of each node
+        # for i, d in enumerate(self.devices):
 
-            # every node send out a ping signal on and
-            # respond to any messages it has received
-            # n.print_n(i=i+1, newline_start=True)
-            ping, sent_messages = d.n.main_loop()
+        #     if not isinstance(d, Device): continue
 
-            if ping != None:
-                self.add_message_to_mid_delivery_messages(ping, d)
-            for m in sent_messages:
-                self.add_message_to_mid_delivery_messages(m, d)
+        #     # every node send out a ping signal on and
+        #     # respond to any messages it has received
+        #     # n.print_n(i=i+1, newline_start=True)
+        #     ping, sent_messages = d.n.main_loop()
 
-        # move the devices, and update connections and edges
+        #     if ping != None:
+        #         self.add_message_to_mid_delivery_messages(ping, d)
+        #     for m in sent_messages:
+        #         self.add_message_to_mid_delivery_messages(m, d)
+
+        ''' move the devices, and update devices, connections and edges 
+
+            there are a variable number of nodes on the map at any given time
+                ranging from N_MIN to N_MAX
+            the simulation starts with the midway point between N_MIN and N_MAX
+            when a node n0 reaches its destination dst
+                the simulation creates 0, 1 or 2 nodes
+                    if there are now <= N_MIN nodes left
+                        create 2
+                    elif there are now >= N_MAX nodes left
+                        create 0
+                    else:
+                        randomly pick between 0, 1, and 2
+                        if the number of nodes left is closer to N_MIN
+                            0 has a low chance
+                            1 has a medium chance
+                            2 has a high chance
+                        elif  the number of nodes left is closer to N_MAX
+                            0 has a high chance
+                            1 has a medium chance
+                            2 has a low chance
+
+            '''
+        devices = []
+        num_devices_that_reached_their_dst = 0
         for d in self.devices:
-            d.move(self.connections[d])
+            reached_dst = d.move(self.connections[d], verbose=True)
+            if reached_dst:
+                num_devices_that_reached_their_dst += 1
+            else:
+                devices.append(d)
+        while num_devices_that_reached_their_dst > 0:
+            num_devices_that_reached_their_dst -= 1
+            num_devices_left = len(devices)
+            if num_devices_left <= N_MIN:
+                num_devices_to_add = 2
+            elif num_devices_left >= N_MAX:
+                num_devices_to_add = 0
+            else:
+                # print('N_MAX=%d   N_MIN=%d    num_devices_left=%d' % (N_MAX, N_MIN, num_devices_left))
+                a = N_MAX - num_devices_left
+                b = num_devices_left - N_MIN
+                c = N_MAX - N_MIN
+                # print(a, b, c)
+                # print(float(a) / c) # this is larger when were closer to N_MIN
+                # print(float(b) / c) # this is small when were closer to N_MIN
+                p1 = 0.30 # p1 = probability of adding 1 device
+                p0 = (1.00-p1)*(float(b) / c) # p0 = probability of adding 0 devices
+                p2 = (1.00-p1)*(float(a) / c) # p2 = probability of adding 2 devices
+                # print('p0=%.2f   p1=%.2f   p2=%.2f' % (p0, p1, p2))
+                rn = random.uniform(0, 1)
+                if 0.00 <= rn <= p0:    num_devices_to_add = 0
+                if p0    < rn <= p0+p1: num_devices_to_add = 1
+                if p0+p1 < rn <= 1.00:  num_devices_to_add = 2
+                # print('num_devices_to_add = %d' % num_devices_to_add)
+            while num_devices_to_add > 0:
+                num_devices_to_add -= 1
+                devices.append(Device(devices))
+                
+        self.devices = devices
         self.connections, self.edges = self.set_connections(self.devices)
 
 
@@ -701,10 +645,6 @@ class Model(object):
 
 
 class PyGameKeyboardController(object):
-    '''
-        Keyboard controller that responds to keyboard input
-    '''
-
 
     def __init__(self):
 
@@ -785,7 +725,7 @@ if __name__ == '__main__':
 
         # update the model
         if not controller.paused:
-            model.update(controller)
+            model.update(controller, verbose=True)
 
         # display the view
         if view.show_view:

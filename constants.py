@@ -38,16 +38,17 @@ import string
 # variable network
 W = 20
 H = 20
-N_MIN, N_MAX = 5, 15
-AVG_VEL = 2.5
-STD_DEV_VEL = 0.5
+N_MIN, N_MAX = 10, 20
+AVG_VEL = 0.01
+STD_DEV_VEL = 0.001
 MAX_VEL = AVG_VEL + 3*STD_DEV_VEL
 MIN_VEL = AVG_VEL - 3*STD_DEV_VEL
-absolute_min_vel = 0.1
+absolute_min_vel = 0.00001
 if MIN_VEL < absolute_min_vel: MIN_VEL = absolute_min_vel
-R = 3.5
+MAX_DST_DIST = 0.01 # max distance from node's destination to count as reaching the destination
+R = 5.0
 
-SCREEN_SCALE = 15.0 # make SCREENSIZE SCREEN_SCALE times as big as coordinate range of 2D rectangular map
+SCREEN_SCALE = 25.0 # make SCREENSIZE SCREEN_SCALE times as big as coordinate range of 2D rectangular map
 SCREEN_SIZE = (
     int(SCREEN_SCALE * W),
     int(SCREEN_SCALE * H)
