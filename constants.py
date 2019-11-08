@@ -25,23 +25,34 @@ import string
 #         # n0 = n
 
 
+# # grid network: N nodes at each point in a W by H grid, N=W*H, R = dist so neighbors in grid are neighbors in network
+# W = 20 # width of grid
+# H = 20 # height of grid
+# N = W * H # number of nodes in the network
+# R = 1 * math.sqrt(2) # max signal radius of each node
+# # coordinate range of 2D rectangular map
+# X_MIN, X_MAX = 0.00, float(W)
+# Y_MIN, Y_MAX = 0.00, float(H)
+# SCREEN_SCALE = 20.0 # make SCREENSIZE SCREEN_SCALE times as big as coordinate range of 2D rectangular map
 
-# SCREEN_SCALE = 15.0 # make SCREENSIZE SCREEN_SCALE times as big as coordinate range of 2D rectangular map
+# variable network
+W = 20
+H = 20
+N_MIN, N_MAX = 5, 15
+AVG_VEL = 2.5
+STD_DEV_VEL = 0.5
+MAX_VEL = AVG_VEL + 3*STD_DEV_VEL
+MIN_VEL = AVG_VEL - 3*STD_DEV_VEL
+absolute_min_vel = 0.1
+if MIN_VEL < absolute_min_vel: MIN_VEL = absolute_min_vel
+R = 3.5
 
-# grid network: N nodes at each point in a W by H grid, N=W*H, R = dist so neighbors in grid are neighbors in network
-W = 20 # width of grid
-H = 20 # height of grid
-N = W * H # number of nodes in the network
-R = 1 * math.sqrt(2) # max signal radius of each node
-# coordinate range of 2D rectangular map
-X_MIN, X_MAX = 0.00, float(W)
-Y_MIN, Y_MAX = 0.00, float(H)
-SCREEN_SCALE = 20.0 # make SCREENSIZE SCREEN_SCALE times as big as coordinate range of 2D rectangular map
-
+SCREEN_SCALE = 15.0 # make SCREENSIZE SCREEN_SCALE times as big as coordinate range of 2D rectangular map
 SCREEN_SIZE = (
-    int(SCREEN_SCALE * (X_MAX - X_MIN)),
-    int(SCREEN_SCALE * (Y_MAX - Y_MIN))
+    int(SCREEN_SCALE * W),
+    int(SCREEN_SCALE * H)
 )
+
 
 
 SIGNAL_SPEED = 3.5 # how far the signal travels per second

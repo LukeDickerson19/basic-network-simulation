@@ -1,3 +1,5 @@
+import os
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
 import time
 import copy
@@ -14,47 +16,65 @@ import numpy as np
 
     TO DO:
 
-        make it so boids appear and disappear each time step
-            a random number between 2 ints is added/deleted
-            randomly pick boids to delete
-            randomly decide where to add them
-            instead of having some boid function
-                have each node move around in a random direction
-                maybe avoid each other (but not neccessary)
-                and with nodes randomly being created and deleted
+        add verbose statements to update and use them to debug it, then debug display
 
-                what if each node has a start and stop point
-                    they're born at point A (random location)
-                    they move to point B (random location)
-                        avoiding other nodes along the way (not nessessary)
-                    then they die at point B
+        keep ping the way it was originally made,
+        but increase the speed, and decrease the period
+        because in reality, if they ping/pong back and forth it will take up unnessessary amounts of band width
 
-                    could this achieve networks:
-                        growing
-                        shrinking
-                        splitting
-                        merging
+        make each node has a start and stop point
+            they're born at point A (random location)
+            they move to point B (random location)
+                avoiding other nodes along the way (not nessessary)
+            then they die at point B
 
-                    for each node:
-                        v0 = get vector to dest
-                        v = v0
-                        for close nodes cn
-                            get angle to node
-                            get opposite angle
-                            vect_magnitude by their closeness (1 / dist)
-                            vector sum to v
+            could this achieve networks:
+                growing
+                shrinking
+                splitting
+                merging
 
-                        make velocity like 1 pixel or very small so
-                        if a node is surrounded by a bunch of nodes and its vector sum pushes it into a node
-                        it will be closer the next time but not NEAR at all colliding and now that its closer
-                        its new vector sum will push it away from the node its getting closer to colliding with
+            variable number of nodes
+            theres a minimum number and a max
+            initially create halfway between
+            when a node n0 reaches its destination dst
+                create 0, 1 or 2 nodes
+                    if there was N_MIN nodes before n0 reached its dst
+                        create 2
+                    elif there was N_MAX nodes before n0 reached its dst
+                        create 0
+                    else:
+                        random([0, 1, 2])
+                        # near N_MIN
+                            0 low chance
+                            1 medium chance
+                            2 high chance
+                        # near N_MAX
+                            0 high chance
+                            1 medium chance
+                            2 low chance
 
-                        each message will need a sent_pos = (x, y) to exand from where it was sent originally
+
+            for each node:
+                v0 = get vector to dest
+                v = v0
+                for close nodes cn
+                    get angle to node
+                    get opposite angle
+                    vect_magnitude by their closeness (1 / dist)
+                    vector sum to v
+
+                make velocity like 1 pixel or very small so
+                if a node is surrounded by a bunch of nodes and its vector sum pushes it into a node
+                it will be closer the next time but not NEAR at all colliding and now that its closer
+                its new vector sum will push it away from the node its getting closer to colliding with
+
+                each message will need a sent_pos = (x, y) to exand from where it was sent originally
 
 
-                    maybe use this
-                    https://github.com/florimondmanca/pyboids
-                    where each boid has its own destination
+            maybe use this
+            https://github.com/florimondmanca/pyboids
+            where each boid has its own destination
 
 
 
@@ -130,6 +150,8 @@ import numpy as np
 
         if the first neighbor can verify the sender is who they say they are, they can pass on that verification, and then verify they're who THEY say they are, and the 2nd neighbor can verify the same, ... and a path can be built
 
+        what if you used the position triangluation to verify that someone isn't using a server farm to run a bunch of nodes
+        in order for nodes to count they need to be spread out (and moving frequenty? what about desktops) to exibit normal device behavior
 
         '''
 
@@ -149,37 +171,37 @@ class PyGameView(object):
         self.show_controls = False # toggle control display
 
 
-    def draw_nodes(self):
-        for n in model.nodes:
-            if not isinstance(n, Node): continue
-            x = int(SCREEN_SCALE*n.x)
-            y = int(SCREEN_SCALE*n.y)
+    def draw_devices(self):
+        for d in model.devices:
+            if not isinstance(d, Device): continue
+            x = int(SCREEN_SCALE*d.n.x)
+            y = int(SCREEN_SCALE*d.n.y)
             pygame.draw.circle(
                 self.surface,
                 pygame.Color('cyan'),
                 (x, y), 5) # (x,y), radius
 
     def draw_in_range_connections(self):
-        for (n1, n2) in model.connections:
-            x1, y1 = int(SCREEN_SCALE*n1.x), int(SCREEN_SCALE*n1.y)
-            x2, y2 = int(SCREEN_SCALE*n2.x), int(SCREEN_SCALE*n2.y)
+        for (d1, d2) in model.edges:
+            x1, y1 = int(SCREEN_SCALE*d1.n.x), int(SCREEN_SCALE*d1.n.y)
+            x2, y2 = int(SCREEN_SCALE*d2.n.x), int(SCREEN_SCALE*d2.n.y)
             pygame.draw.line(
                 self.surface,
                 pygame.Color('blue'),
                 (x1, y1), (x2, y2), 1)
 
-    def draw_message_dot(self, d, color):
-        sn, rn = d['sender_node'], d['receiver_node']
-        mx = int(SCREEN_SCALE * ((d['dist_traveled'] / d['dist_to_travel'])*(rn.x - sn.x) + sn.x))
-        my = int(SCREEN_SCALE * ((d['dist_traveled'] / d['dist_to_travel'])*(rn.y - sn.y) + sn.y))
+    def draw_message_dot(self, mdm, color):
+        sn, rn = mdm['sender_device'].n, mdm['receiver_device'].n
+        dist_sn_to_rn = math.sqrt((sn.x - rn.x)**2 + (sn.y - rn.y)**2)
+        x = int(SCREEN_SCALE * ((mdm['dist_traveled'] / dist_sn_to_rn)*(rn.x - sn.x) + sn.x))
+        y = int(SCREEN_SCALE * ((mdm['dist_traveled'] / dist_sn_to_rn)*(rn.y - sn.y) + sn.y))
         pygame.draw.circle(
             self.surface,
             pygame.Color(color),
-            (mx, my), 2) # (x,y), radius
+            (x, y), 2) # (x,y), radius
 
-    def draw_message_circle(self, d, color, fade=True):
-        sn = d['sender_node']
-        r = d['dist_traveled']
+    def draw_message_circle(self, mdm, color, fade=True):
+        r = mdm['dist_traveled']
         if fade:
             non_zero_rgb_value = int(255 * ((float(R - r) / R)**10 if r < R else 0.0))
             if color == 'darkgreen': color = (0, non_zero_rgb_value, 0)
@@ -189,33 +211,33 @@ class PyGameView(object):
             color = pygame.Color(color)
         r = int(SCREEN_SCALE * r)
         if r > 1:
-            x = int(SCREEN_SCALE * sn.x)
-            y = int(SCREEN_SCALE * sn.y)
+            x = int(SCREEN_SCALE * mdm['send_pt' ][0])
+            y = int(SCREEN_SCALE * mdm['send_pt' ][1])
             pygame.draw.circle(
                 self.surface,
                 color,
                 (x, y), r, 1) # (x,y), radius
 
     def draw_pings(self):
-        for d in self.model.mid_delivery_messages:
-            if d['sender_node'] == model.nodes[0]: # just draw 1 node's ping right now
-                if d['message'].m.startswith('PING'):
-                    self.draw_message_circle(d, 'darkgreen', fade=True)
-                    self.draw_message_dot(d, 'green')
+        for mdm in self.model.mid_delivery_messages:
+            if mdm['sender_device'] != model.devices[0]: continue # just draw 1 device's ping right now
+            if mdm['message'].m.startswith('PING'):
+                self.draw_message_circle(mdm, 'darkgreen', fade=True)
+                self.draw_message_dot(mdm, 'green')
 
     def draw_echos(self):
-        for d in self.model.mid_delivery_messages:
-            if d['receiver_node'] == model.nodes[0]: # just draw 1 node's echo right now
-                if d['message'].m.startswith('ECHO'):
-                    self.draw_message_circle(d, 'darkred', fade=True)
-                    self.draw_message_dot(d, 'red')
+        for mdm in self.model.mid_delivery_messages:
+            if mdm['receiver_device'] != model.devices[0]: continue # just draw 1 device's return echos right now
+            if mdm['message'].m.startswith('ECHO'):
+                self.draw_message_circle(mdm, 'darkred', fade=True)
+                self.draw_message_dot(mdm, 'red')
 
     def draw_messages(self):
-        for d in self.model.mid_delivery_messages:
-            if not d['message'].m.startswith('PING') \
-            and not d['message'].m.startswith('ECHO'):
-                self.draw_message_circle(d, 'cyan', fade=True)
-                self.draw_message_dot(d, 'cyan')
+        for mdm in self.model.mid_delivery_messages:
+            if not mdm['message'].m.startswith('PING') \
+            and not mdm['message'].m.startswith('ECHO'):
+                self.draw_message_circle(mdm, 'cyan', fade=True)
+                self.draw_message_dot(mdm, 'cyan')
 
     def draw(self):
 
@@ -226,7 +248,7 @@ class PyGameView(object):
         self.draw_pings()
         self.draw_echos()
         # self.draw_messages()
-        self.draw_nodes()
+        self.draw_devices()
 
         # # example shapes
         # pygame.draw.circle(self.surface, pygame.Color('green'), (250,250), 10) # (x,y), radius
@@ -241,7 +263,6 @@ class PyGameView(object):
 
         # update display
         pygame.display.update()
-
 
     def draw_text(self, text, x, y, size, \
         text_color = (100, 100, 100), \
@@ -261,12 +282,71 @@ class PyGameView(object):
         self.surface.blit(text_render, (x, y))
 
 
-class Model(object):
-    '''
-        Model represents the state of all entities in
-        the environment and drawing parameters
+class Device(object):
 
-    '''
+    def __init__(self, devices):
+
+        self.src, self.dst = self.set_source_and_destination(devices)
+        self.vel = self.set_velocity()
+        # print('src = (%.4f, %.4f)' % (self.src[0], self.src[1]))
+        self.n = Node(self.src[0], self.src[1], grid=False)
+
+    def set_source_and_destination(self, devices):
+
+        # pick a random side
+        sides = ['left', 'right', 'top', 'bottom']
+        src_side = random.choice(sides)
+
+        # pick a portion of the side that no other node is at
+        src = None
+        while src == None:
+            if src_side == 'left':   src = (0, H * random.uniform(0, 1))
+            if src_side == 'right':  src = (W, H * random.uniform(0, 1))
+            if src_side == 'top':    src = (W * random.uniform(0, 1), H)
+            if src_side == 'bottom': src = (W * random.uniform(0, 1), 0)
+            for d in devices:
+                if d.n.x == src[0] and d.n.y == src[1]:
+                    src = None
+                    break
+
+        # pick a random other side
+        sides.remove(src_side)
+        dst_side = random.choice(sides)
+
+        # pick a portion of that other side
+        if dst_side == 'left':   dst = (0, H * random.uniform(0, 1))
+        if dst_side == 'right':  dst = (W, H * random.uniform(0, 1))
+        if dst_side == 'top':    dst = (W * random.uniform(0, 1), H)
+        if dst_side == 'bottom': dst = (W * random.uniform(0, 1), 0)
+
+        return src, dst
+
+    def set_velocity(self):
+        vel = random.gauss(AVG_VEL, STD_DEV_VEL) # normal distribution
+        vel = MIN_VEL if vel < MIN_VEL else vel
+        vel = MAX_VEL if vel > MAX_VEL else vel
+        return vel
+
+    def move(self, close_devices):
+        x, y = self.n.x, self.n.y
+        dx, dy = x-self.dst[0], y-self.dst[1] # x and y dist to dst
+        dst_dist = math.sqrt(dx**2 + dy**2) # distance to destination
+        theta0 = np.arctan2(dx, dy) # v0 = angle to dst
+        mag = min(self.vel, dst_dist)
+        v0 = (mag * np.cos(theta0), mag * np.sin(theta0)) # v0 = vector to destination
+        v_sum = v0
+        for d, dist in close_devices.items():
+            theta = np.arctan2(x-d.n.x, y-d.n.y) + np.pi
+            mag = float(1 / dist)
+            v = (mag * np.cos(theta0), mag * np.sin(theta0)) # v0 = vector to destination
+            v_sum = (v_sum[0] + v[0], v_sum[1] + v[1])
+        self.n.x += v_sum[0]
+        self.n.y += v_sum[1]
+
+    def print_d(self, num_devices, i='?', start_space='    ', newline_start=False):
+        self.n.print_n(num_devices, i=i, start_space=start_space, newline_start=newline_start)
+
+class Model(object):
 
     def __init__(self):
         '''
@@ -277,9 +357,10 @@ class Model(object):
         '''
 
         # create network
-        # self.nodes, self.connections = self.create_network0(verbose=True)
-        # self.nodes, self.connections = self.create_network1(verbose=True)
-        self.nodes, self.connections = self.create_grid_network(verbose=True)
+        # self.nodes, self.connections = self.create_random_network(verbose=True)
+        # self.nodes, self.connections = self.create_grid_network(verbose=True)
+        self.devices = self.create_variable_network(verbose=True)
+        self.connections, self.edges = self.set_connections(self.devices, verbose=True)
 
         # list of messages that are being delivered. Used just for time delay in simulation
         # format: [(receiver_node, delivery_time, message), ...]
@@ -292,9 +373,6 @@ class Model(object):
         # window parameters / drawing
         self.show = True # show current model
 
-
-
-    # this function updates the model
     def update(self, controller):
 
         # move message signals forward,
@@ -302,78 +380,134 @@ class Model(object):
         # else keep it in the mid_delivery_messages list
         t = time.time()
         new_mid_delivery_messages = []
-        for d in self.mid_delivery_messages:
-            d['dist_traveled'] += (SIGNAL_SPEED * (t - self.t1))
-            if d['dist_traveled'] >= d['dist_to_travel']:
-                rn = d['receiver_node']
+        for mdm in self.mid_delivery_messages:
+            mdm['dist_traveled'] += (SIGNAL_SPEED * (t - self.t1))
+            sp, rn = mdm['send_pt'], mdm['receiver_device'].n
+            dist_send_pt_to_rn = math.sqrt((sp[0] - rn.x)**2 + (sp[1] - rn.y)**2)
+            if mdm['dist_traveled'] >= dist_send_pt_to_rn: # reached receiver device
+                rd = d['receiver_device']
                 m  = d['message']
-                rn.messages.append(m)
+                rd.n.messages.append(m)
             else:
-                new_mid_delivery_messages.append(d)
+                new_mid_delivery_messages.append(mdm)
         self.mid_delivery_messages = new_mid_delivery_messages
 
         # run the main loop of each node
-        for i, n in enumerate(self.nodes):
+        for i, d in enumerate(self.devices):
 
-            if not isinstance(n, Node): continue
+            if not isinstance(d, Device): continue
 
-            # every node send out a ping signal and
+            # every node send out a ping signal on and
             # respond to any messages it has received
-            # n.nprint(i=i+1, newline=True)
-            ping, messages_to_send = n.main_loop()
-            if ping != None:
-                self.add_message_to_mid_delivery_messages(ping, n)
-            for m in messages_to_send:
-                self.add_message_to_mid_delivery_messages(m, n)
+            # n.print_n(i=i+1, newline_start=True)
+            ping, sent_messages = d.n.main_loop()
 
-        # update the Nodes in the network every AUTOMATA_PERIOD
-        if (t - self.t2) > AUTOMATA_PERIOD:
-            self.evolve_grid(verbose=True)
-            self.t2 = t
+            if ping != None:
+                self.add_message_to_mid_delivery_messages(ping, d)
+            for m in sent_messages:
+                self.add_message_to_mid_delivery_messages(m, d)
+
+        # move the devices, and update connections and edges
+        for d in self.devices:
+            d.move(self.connections[d])
+        self.connections, self.edges = self.set_connections(self.devices)
+
+
+        # # update the Nodes in the network every AUTOMATA_PERIOD
+        # if (t - self.t2) > AUTOMATA_PERIOD:
+        #     self.evolve_grid(verbose=True)
+        #     self.t2 = t
 
         self.t1 = t # update t1 at end of update()
 
-        #     input()
-
+        #    input()
         # sys.exit()
+
+    def set_connections(self, devices, verbose=False):
+        connections = {} # {keys=devices, value={key=neighbor_device, value=distance}}
+        edges = []
+        for d0 in devices:
+            if not isinstance(d0, Device): continue
+            neighbors = self.set_direct_neighbors(d0, devices)
+            connections[d0] = neighbors
+            for d in neighbors.keys():
+                if (d0, d) not in edges \
+                and (d, d0) not in edges:
+                    edges.append((d0, d))
+        if verbose:
+            print('\nConnections:')
+            num_devices = len(devices)
+            for i, (d0, neighbors) in enumerate(connections.items()):
+                print()
+                d0.print_d(num_devices, i=i+1)
+                num_neighbors = len(neighbors)
+                print('    has %d direct neighbor(s)' % num_neighbors)
+                if num_neighbors > 0:
+                    for j, neighbor in enumerate(neighbors):
+                        neighbor.print_d(num_neighbors, i=j+1, start_space='        ')
+            print('\n%d Edges:' % len(edges))
+            for i, edge in enumerate(edges):
+                print('   edge %d' % (i+1))
+                edge[0].print_d(2, i=1, start_space='        ')
+                edge[1].print_d(2, i=2, start_space='        ')
+                print()
+            print()
+        return connections, edges
+
+    def set_direct_neighbors(self, d0, devices, verbose=False):
+        neighbors = {} # key = neighboring device, value = distance
+        for d in devices:
+            if not isinstance(d0, Device): continue
+            if d != d0:
+                dist = math.sqrt((d.n.x - d0.n.x)**2 + (d.n.y - d0.n.y)**2)
+                if dist <= R:
+                    neighbors[d] = dist
+        if verbose:
+            print('%d Direct Neighbors:' % len(neighbors.keys()))
+            for neighbor in neighbors.keys(): neighbor.print_d(newline_start=False)
+        return neighbors
+
+    def add_message_to_mid_delivery_messages(self, message, d0):
+        for neighbor, dist in self.connections[d0].items():
+            self.mid_delivery_messages.append({
+                'sender_device'    : d0,
+                'receiver_device'  : neighbor,
+                'dist_traveled'    : 0.00,
+                'send_pt'          : (d0.n.x, d0.n.y),
+                'message'          : message
+            })
+
+    def create_variable_network(self, verbose=False):
+        devices = []
+        n_to_create = int(((N_MAX - N_MIN) / 2) + N_MIN) # create halfway between N_MIN and N_MAX
+        while n_to_create > 0:
+            n_to_create -= 1
+            devices.append(Device(devices))
+        if verbose:
+            print('Nodes:')
+            num_devices = len(devices)
+            for i, d in enumerate(devices):
+                d.print_d(num_devices, i=i+1)
+        return devices
+    def get_num_nodes_to_create(self):
+        current_num_nodes = len(self.nodes)
+        min_nodes_possible_to_create = max(N_MIN - current_num_nodes, N_CREATE_MIN)
+        max_nodes_possible_to_create = min(N_MAX - current_num_nodes, N_CREATE_MAX)
+        return random.uniform(min_nodes_possible_to_create, max_nodes_possible_to_create)
 
 
     def fully_connected_network(self):
         for n in self.nodes:
-            neighbors = self.get_direct_neighbors(n)
+            neighbors = self.set_direct_neighbors(n)
             if len(neighbors.keys()) == 0:
                 return False
         return True
-
-    def get_connections(self, nodes):
-        connections = []
-        for n0 in nodes:
-            if isinstance(n0, Node):
-                n1s = self.get_direct_neighbors(n0, nodes)
-                for n1 in n1s:
-                    if (n0, n1) not in connections \
-                    and (n1, n0) not in connections:
-                        connections.append((n0, n1))
-        return connections
-
-    def get_direct_neighbors(self, n0, nodes, verbose=False):
-        neighbors = {} # key = neighboring node, value = range
-        for n in nodes:
-            if isinstance(n, Node) and n != n0:
-                dist = math.sqrt((n.x - n0.x)**2 + (n.y - n0.y)**2)
-                if dist <= R:
-                    neighbors[n] = dist
-        if verbose:
-            print('%d Direct Neighbors:' % len(neighbors.keys()))
-            for neighbor in neighbors.keys(): neighbor.nprint(newline=False)
-        return neighbors
-
     # return a list of node networks
     def get_networks(self, nodes, verbose=False):
 
         def get_network_recurrsively(n0, network):
             network += [n0]
-            for n in self.get_direct_neighbors(n0, unvisited_nodes):
+            for n in self.set_direct_neighbors(n0, unvisited_nodes):
                 if n not in network:
                     network = get_network_recurrsively(n, network)
             return network
@@ -393,14 +527,13 @@ class Model(object):
             for i, network in enumerate(networks):
                 print('\nNetwork %d has %d node(s)' % (i+1, len(network)))
                 for n in network:
-                    n.nprint()
+                    n.print_n()
 
         return networks
-
     # network 0: N nodes constantly throughout all time steps for the entire simulation
     def create_random_network(self, verbose=False):
         nodes = [Node() for _ in range(N)]
-        connections = self.get_connections(nodes)
+        connections = self.set_connections(nodes)
         networks = self.get_networks(nodes, verbose=verbose)
         return nodes, connections
     # def create_network0(self, verbose=False):
@@ -408,7 +541,7 @@ class Model(object):
     #     while len(self.nodes) < N:
     #         n = Node()
     #         self.nodes.append(n)
-    #         if len(self.get_direct_neighbors(n).keys()) == 0:
+    #         if len(self.set_direct_neighbors(n).keys()) == 0:
     #             self.nodes.remove(n)
     #     return self.nodes
     # def create_network0(self, verbose=False):
@@ -438,7 +571,7 @@ class Model(object):
                     s += ('N' if isinstance(nodes[x*H+y], Node) else '*') + ' '
                 print(s)
 
-        connections = self.get_connections(nodes)
+        connections = self.set_connections(nodes)
         # networks = self.get_networks(nodes, verbose=verbose)
         return nodes, connections
     def evolve_grid(self, verbose=False):
@@ -555,7 +688,7 @@ class Model(object):
         nodes = [non_empty_nodes[random.randint(len(non_empty_nodes))]] if nodes == [] else nodes
 
         self.nodes = nodes
-        self.connections = self.get_connections(self.nodes)
+        self.connections = self.set_connections(self.nodes)
 
         if verbose:
             print('Grid Evolution')
@@ -565,17 +698,6 @@ class Model(object):
                     s += ('N' if isinstance(self.nodes[x*H+y], Node) else '*') + ' '
                 print(s)
             print('------------------------------------------------------')
-
-    def add_message_to_mid_delivery_messages(self, message, n0):
-        neighbors = self.get_direct_neighbors(n0, self.nodes, verbose=True)
-        for neighbor, dist in neighbors.items():
-            self.mid_delivery_messages.append({
-                'sender_node'    : n0,
-                'receiver_node'  : neighbor,
-                'dist_traveled'  : 0.00,
-                'dist_to_travel' : math.sqrt((n0.x - neighbor.x)**2 + (n0.y - neighbor.y)**2),
-                'message'        : message
-            })
 
 
 class PyGameKeyboardController(object):
