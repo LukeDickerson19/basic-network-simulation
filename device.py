@@ -35,11 +35,11 @@ class Device(object):
 
     def set_source_and_destination(self, devices):
 
-        # pick a random side
+        # pick a random side of the map to start the device at
         sides = ['left', 'right', 'top', 'bottom']
         src_side = random.choice(sides)
 
-        # pick a portion of the side that no other node is at
+        # pick a random point on that side and start the device there
         src = None
         while src == None:
             if src_side == 'left':   src = (0, H * random.uniform(0, 1))
@@ -51,11 +51,16 @@ class Device(object):
                     src = None
                     break
 
-        # pick a random other side
-        sides.remove(src_side)
-        dst_side = random.choice(sides)
+        # pick the opposite side for the dst
+        if src_side == 'left':   dst_side = 'right'
+        if src_side == 'right':  dst_side = 'left'
+        if src_side == 'top':    dst_side = 'bottom'
+        if src_side == 'bottom': dst_side = 'top'
+        # # pick a random other side
+        # sides.remove(src_side)
+        # dst_side = random.choice(sides)
 
-        # pick a portion of that other side
+        # pick a random point on that side and set the dst there
         if dst_side == 'left':   dst = (0, H * random.uniform(0, 1))
         if dst_side == 'right':  dst = (W, H * random.uniform(0, 1))
         if dst_side == 'top':    dst = (W * random.uniform(0, 1), H)
