@@ -14,6 +14,7 @@ from message import Message
 import numpy as np
 
 
+
 ''' NOTES:
 
     DESCRIPTION:
@@ -38,33 +39,45 @@ import numpy as np
 
         NOW:
 
-            do signal stuff
-                make mid_delivery_messages not have a receiver node
-                    if distance between the send_pt and a device is inbetween the
-                    the message distance_travelled before and after this timestep
-                        (where the message dist_travelled is incremented by SIGNAL_SPEED)
-                        then deliver the message to the device
-                            we need to make it somehow account for the fact that if the device
-                            is right on the edge between
-                                d1, dist_travelled, and
-                                d2, dist_travelled + SIGNAL_SPEED
-                            and then it moves from >d2 to <d2, it could receive the signal twice
-                            we also need to make sure the sender_node doesn't receive its own signal
-                                however so long as MAX_VEL of a device is less than the SIGNAL_SPEED,
-                                if we move the devices AND THEN send the message and give the message
-                                a starting dist_travelled of SIGNAL_SPEED then ... idk ...
-                                ... i think the sender_node won't receive the message
-                                OR we could just say: if device != mdm['sender_device']
-                    if dist_travelled >= R:
-                        delete signal
+            signal stuff
 
                 draw signals better
 
+                    something is wrong with the way the colors of the signals are displayed.
+                        pings's appear green when they should be red
+                        make it so you can toggle seeing
+                            selected device's:
+                                pings
+                                echos
+                                messages
+                            devices' in range of selected device:
+                                pings
+                                echos
+                                messages
+
                     make signal ring's opaqueness increase as r approaches R
+                        apparently this is much harder than it seems because
+                        the draw.circle fn. in pygame doesn't take an alpha value
+                            so we need to make the color of the ring fade to the
+                            background color instead of decreasing the alpha value
+                                but theres 2 possible background colors,
+                                    BACKGROUND_COLOR black (0, 0, 0)
+                                    SELECTED_DEVICE_COLOR gray8 (20, 20, 20)
+
+                                    so instead of creating a circle we would need
+                                    to create 2 arcs. 1 arc fades to
+                                        BACKGROUND_COLOR and the other fades to 
+                                        SELECTED_DEVICE_COLOR
+
+                                        to find the 2 angles where the arcs are separated
+                                        we need to find the intercept of 2 overlapping circles
+                                            (w/ known coordinates and radii)
 
                     put signal rings underneath everything else
 
                     make node turn red, green, white right before it sends a message
+                        give them a time delay
+                            perhaps fade from signal_color to NODE_DEFAULT_COLOR after signal is sent
 
                     why is there so many echos?
                         i think each echo is technically to everyone, and its the matching message that specifies who its for
@@ -106,7 +119,8 @@ import numpy as np
                 because in reality, if they ping/pong back and forth it will take up unnessessary amounts of band width
                     so doing it on a period is better
 
-            do controls
+            controls stuff
+
                 manually send message to another node
 
 
@@ -380,7 +394,7 @@ class View(object):
         self.draw_selected_device_range()
         self.draw_in_range_connections()
         self.draw_signals()
-        # self.draw_messages()
+        self.draw_messages()
         # self.draw_paths_to_dst()
         self.draw_devices()
 
@@ -421,7 +435,9 @@ class View(object):
                 (x, y), 5) # (x,y), radius
 
     def draw_in_range_connections(self):
-        for (d1, d2) in model.edges:
+        for edge in model.edges:
+            edge = tuple(edge)
+            d1, d2 = edge[0], edge[1]
             x1, y1 = int(SCREEN_SCALE*d1.n.x), int(SCREEN_SCALE*d1.n.y)
             x2, y2 = int(SCREEN_SCALE*d2.n.x), int(SCREEN_SCALE*d2.n.y)
             pygame.draw.line(
@@ -442,22 +458,99 @@ class View(object):
                 (255, 0, 0),
                 (x2, y2), 5) # (x,y), radius
 
-
     def draw_messages(self):
-        for mdm in self.model.mid_delivery_messages:
+        sd = self.model.selected_device
+        for signal in self.model.signals:
+            if signal['sender_device'] != sd: continue
+            if not signal['message'].m.startswith('ECHO'): continue
             color = DOT_MESSAGE_COLOR
-            if mdm['message'].m.startswith('PING'): color = DOT_PING_COLOR
-            if mdm['message'].m.startswith('ECHO'): color = DOT_ECHO_COLOR
-            draw_message_dot(mdm, color)
-    def draw_message_dot(self, mdm, color):
-        sn, rn = mdm['sender_device'].n, mdm['receiver_device'].n
-        dist_sn_to_rn = math.sqrt((sn.x - rn.x)**2 + (sn.y - rn.y)**2)
-        x = int(SCREEN_SCALE * ((mdm['dist_traveled'] / dist_sn_to_rn)*(rn.x - sn.x) + sn.x))
-        y = int(SCREEN_SCALE * ((mdm['dist_traveled'] / dist_sn_to_rn)*(rn.y - sn.y) + sn.y))
-        pygame.draw.circle(
-            self.surface,
-            pygame.Color(color),
-            (x, y), 2) # (x,y), radius
+            if signal['message'].m.startswith('PING'): color = DOT_PING_COLOR
+            if signal['message'].m.startswith('ECHO'): color = DOT_ECHO_COLOR
+            self.draw_message_dot(signal, color)
+    def draw_message_dot(self, signal, color):
+        sn, sp = signal['sender_device'].n, signal['send_pt']
+        cx, cy, r = sp[0], sp[1], signal['dist_traveled'] # circle variables
+        for edge in self.model.edges:
+            edge = tuple(edge)
+            n1, n2 = edge[0].n, edge[1].n
+
+            # if just one, XOR, of the connection endpoints is within the signal ring
+            dist_sp_to_d1 = math.sqrt((n1.x - cx)**2 + (n1.y - cy)**2)
+            d1_in_signal_ring = signal['dist_traveled'] >= dist_sp_to_d1
+            dist_sp_to_d2 = math.sqrt((n2.x - cx)**2 + (n2.y - cy)**2)
+            d2_in_signal_ring = signal['dist_traveled'] >= dist_sp_to_d2
+            if d1_in_signal_ring != d2_in_signal_ring: # != is XOR (exclusive OR)
+
+                # print()
+                # print('(cx, cy) = (%.4f, %.4f)'  % (cx, cy))
+                # n1.print_n()
+                # n2.print_n()
+
+                # 2D linear equation: y = m*x + b
+                m = (n2.y - n1.y) / (n2.x - n1.x) # m = rise / run
+                b = n2.y - m*n2.x
+
+                # print('m = %.4f' % m)
+                # print('b = %.4f' % b)
+                # print('r = %.4f' % r)
+
+                # quadratic for x
+                _a = m**2 + 1.0
+                _b = 2*(m*(b - cy) - cx)
+                _c = cx**2 + (b - cy)**2 - r**2
+                b2_minus_4ac = _b**2 - 4*_a*_c
+                b2_minus_4ac = 0 if b2_minus_4ac < 0 else b2_minus_4ac
+
+                # print('_a = %.4f' % _a)
+                # print('_b = %.4f' % _b)
+                # print('_c = %.4f' % _c)
+
+                x_intercept_plus  = (-_b + math.sqrt(b2_minus_4ac)) / (2*_a)
+                x_intercept_minus = (-_b - math.sqrt(b2_minus_4ac)) / (2*_a)
+
+                # print('x_intercept_plus  = %.4f' % x_intercept_plus)
+                # print('x_intercept_minus = %.4f' % x_intercept_minus)
+
+                # quadratic for y
+                _a = (1.0 / m**2) + 1.0
+                _b = -((2 / m)*((b / m) + cx) + 2*cy)
+                _c = ((b / m) + cx)**2 + cy**2 - r**2
+                b2_minus_4ac = _b**2 - 4*_a*_c
+                b2_minus_4ac = 0 if b2_minus_4ac < 0 else b2_minus_4ac
+
+                # print('_a = %.4f' % _a)
+                # print('_b = %.4f' % _b)
+                # print('_c = %.4f' % _c)
+
+                y_intercept_plus  = (-_b + math.sqrt(b2_minus_4ac)) / (2*_a)
+                y_intercept_minus = (-_b - math.sqrt(b2_minus_4ac)) / (2*_a)
+
+                # print('y_intercept_plus  = %.4f' % y_intercept_plus)
+                # print('y_intercept_minus = %.4f' % y_intercept_minus)
+                # print()
+
+                x_min, x_max = (n1.x, n2.x) if n1.x <= n2.x else (n2.x, n1.x)
+                x = int(SCREEN_SCALE * (x_intercept_plus if x_min <= x_intercept_plus <= x_max else x_intercept_minus))
+
+                y_min, y_max = (n1.y, n2.y) if n1.y <= n2.y else (n2.y, n1.y)
+                y = int(SCREEN_SCALE * (y_intercept_plus if y_min <= y_intercept_plus <= y_max else y_intercept_minus))
+
+                # source: https://www.analyzemath.com/Calculators/find_points_of_intersection_of_circle_and_line.html
+
+                pygame.draw.circle(
+                    self.surface,
+                    pygame.Color(color),
+                    (x, y), 3) # (x,y), radius
+
+
+        # sn, rn = mdm['sender_device'].n, mdm['receiver_device'].n
+        # dist_sn_to_rn = math.sqrt((sn.x - rn.x)**2 + (sn.y - rn.y)**2)
+        # x = int(SCREEN_SCALE * ((mdm['dist_traveled'] / dist_sn_to_rn)*(rn.x - sn.x) + sn.x))
+        # y = int(SCREEN_SCALE * ((mdm['dist_traveled'] / dist_sn_to_rn)*(rn.y - sn.y) + sn.y))
+        # pygame.draw.circle(
+        #     self.surface,
+        #     pygame.Color(color),
+        #     (x, y), 2) # (x,y), radius
 
     def draw_signals(self):
         sd = self.model.selected_device
@@ -523,7 +616,10 @@ class Model(object):
 
     def __init__(self):
 
-        # create devices
+        # create devices, connections and edges
+        # devices: [Device(), Device(), ...]
+        # connections: {keys=devices : value={key=neighbor_device, value=distance}}
+        # edges: [{device0, device1}, {device2, device0}, ...]
         self.devices = self.init_moving_devices(verbose=False)
         self.connections, self.edges = self.set_connections(self.devices, verbose=False)
 
@@ -539,7 +635,8 @@ class Model(object):
 
         # controller variables
         self.selected_device = None # device user clicked on
-        self.pause_movement  = False # pause/play movement
+        self.pause_devices  = False # pause/play movement
+        self.pause_nodes    = False # pause/play signals
 
 
     # main_loop of the model
@@ -550,54 +647,64 @@ class Model(object):
 
         # move message signals forward,
         # deliver message if it's reached a node,
-        # remove it when its travelled R distance
-        signals_outside_range = []
-        for signal in self.signals:
+        # remove it when its travelled R 
+        if not self.pause_nodes:
+            signals_outside_range = []
+            for signal in self.signals:
 
-            # if signal['sender_device'] == self.selected_device:
-            #     self.print_signal(signal)
+                # if signal['sender_device'] == self.selected_device:
+                #     # print signal
+                #     print('Sender Device:')
+                #     signal['sender_device'].print_d()
+                #     print('dist_traveled = %.2f' % signal['dist_traveled'])
+                #     print('send_pt = (%.2f, %.2f)' % (signal['send_pt'][0], signal['send_pt'][1]))
+                #     signal['message'].print_m()
+                #     print('receiver_devices:')
+                #     for rd in signal['receiver_devices']:
+                #         rd.print_d()
+                #     print()
 
-            # move message forward
-            prev_signal_dist = signal['dist_traveled']
-            signal['dist_traveled'] += (SIGNAL_SPEED * (t - self.t1))
-            if signal['dist_traveled'] > R: signal['dist_traveled'] = R
+                # move message forward
+                prev_signal_dist = signal['dist_traveled']
+                signal['dist_traveled'] += (SIGNAL_SPEED * (t - self.t1))
+                if signal['dist_traveled'] > R: signal['dist_traveled'] = R
 
-            # deliver message if it's reached a node
-            sn, sp = signal['sender_device'].n, signal['send_pt']
-            x, y = sp[0], sp[1]
-            for d in self.devices:
-                if d != sn:
+                # deliver message if it's reached a node
+                sn, sp = signal['sender_device'].n, signal['send_pt']
+                x, y = sp[0], sp[1]
+                for d in self.devices:
+                    if d != sn:
 
-                    # put the signal's message in device d's mailbox if the signal just passed d
-                    dist_sp_to_d = math.sqrt((d.n.x - x)**2 + (d.n.y - y)**2)
-                    if prev_signal_dist <= dist_sp_to_d <= signal['dist_traveled'] \
-                    and d not in signal['receiver_devices']:
-                        d.n.mailbox.append(signal['message'])
-                        signal['receiver_devices'].add(d)
+                        # put the signal's message in device d's mailbox if the signal just passed d
+                        dist_sp_to_d = math.sqrt((d.n.x - x)**2 + (d.n.y - y)**2)
+                        if prev_signal_dist <= dist_sp_to_d <= signal['dist_traveled'] \
+                        and d not in signal['receiver_devices']:
+                            d.n.mailbox.append(signal['message'])
+                            signal['receiver_devices'].add(d)
 
-            # remove message that have reached the max signal range
-            if signal['dist_traveled'] == R:
-                signals_outside_range.append(signal)
-        for signal in signals_outside_range:
-            self.signals.remove(signal)
+                # remove message that have reached the max signal range
+                if signal['dist_traveled'] == R:
+                    signals_outside_range.append(signal)
+            for signal in signals_outside_range:
+                self.signals.remove(signal)
 
-        # run the main loop of each node
-        for i, d in enumerate(self.devices):
+            # run the main loop of each node
+            for i, d in enumerate(self.devices):
 
-            if not isinstance(d, Device): continue
+                if not isinstance(d, Device): continue
 
-            # every node sends out a ping signal on a timed interval
-            # and responds to any messages it has received immediately
-            # n.print_n(i=i+1, num_nodes=len(devices), newline_start=True)
-            sent_messages = d.n.main_loop(verbose=False)#d==self.selected_device)
-            for message in sent_messages:
-                self.signals.append({
-                    'sender_device'    : d,
-                    'dist_traveled'    : 0.00,
-                    'send_pt'          : (d.n.x, d.n.y),
-                    'message'          : message,
-                    'receiver_devices' : set()
-                })
+                # every node sends out a ping signal on a timed interval
+                # and responds to any messages it has received immediately
+                # n.print_n(i=i+1, num_nodes=len(devices), newline_start=True)
+                sent_messages = d.n.main_loop(verbose=False)#d==self.selected_device)
+                for message in sent_messages:
+                    self.signals.append({
+                        'sender_device'    : d,
+                        'dist_traveled'    : 0.00,
+                        'send_pt'          : (d.n.x, d.n.y),
+                        'message'          : message,
+                        'receiver_devices' : set()
+                    })
 
         ''' move the devices, and update devices, connections and edges
 
@@ -622,13 +729,15 @@ class Model(object):
                             2 has a low chance
 
             '''
-        if not self.pause_movement:
+        if not self.pause_devices:
             devices = []
             num_devices_that_reached_their_dst = 0
             for d in self.devices:
                 reached_dst = d.move(self.connections[d], verbose=False)
                 if reached_dst:
                     num_devices_that_reached_their_dst += 1
+                    if d == self.selected_device:
+                        self.selected_device = None
                 else:
                     devices.append(d)
             while num_devices_that_reached_their_dst > 0:
@@ -665,17 +774,6 @@ class Model(object):
 
         self.t1 = t # update t1 at end of update()
 
-    def print_signal(self, signal):
-        print('Sender Device:')
-        signal['sender_device'].print_d()
-        print('dist_traveled = %.2f' % signal['dist_traveled'])
-        print('send_pt = (%.2f, %.2f)' % (signal['send_pt'][0], signal['send_pt'][1]))
-        signal['message'].print_m()
-        print('receiver_devices:')
-        for rd in signal['receiver_devices']:
-            rd.print_d()
-        print()
-
     # create devices that move around the map
     def init_moving_devices(self, verbose=False):
         devices = []
@@ -694,15 +792,14 @@ class Model(object):
     # {keys=devices, value={key=neighbor_device : value=distance}}
     def set_connections(self, devices, verbose=False):
         connections = {} # {keys=devices : value={key=neighbor_device, value=distance}}
-        edges = []
+        edges = [] # [{device0, device1}, {device2, device0}, ...]
         for d0 in devices:
             if not isinstance(d0, Device): continue
             neighbors = self.set_direct_neighbors(d0, devices)
             connections[d0] = neighbors
             for d in neighbors.keys():
-                if (d0, d) not in edges \
-                and (d, d0) not in edges:
-                    edges.append((d0, d))
+                if {d0, d} not in edges:
+                    edges.append({d0, d})
         if verbose:
             print('\nConnections:')
             num_devices = len(devices)
@@ -716,9 +813,11 @@ class Model(object):
                         neighbor.print_d(num_devices=num_neighbors, i=j+1, start_space='        ')
             print('\n%d Edges:' % len(edges))
             for i, edge in enumerate(edges):
+                edge = tuple(edge)
+                d1, d2 = edge[0], edge[1]
                 print('   edge %d' % (i+1))
-                edge[0].print_d(num_devices=2, i=1, start_space='        ')
-                edge[1].print_d(num_devices=2, i=2, start_space='        ')
+                d1.print_d(num_devices=2, i=1, start_space='        ')
+                d2.print_d(num_devices=2, i=2, start_space='        ')
                 print()
             print()
         return connections, edges
@@ -771,7 +870,11 @@ class Controller(object):
                     if verbose: print('event.button = %d' % event.button)
         elif event.key == pygame.K_SPACE:
             if verbose: print('space bar')
-            self.model.pause_movement = not self.model.pause_movement
+            self.model.pause_devices = not self.model.pause_devices
+
+        elif event.key == pygame.K_n:
+            if verbose: print('n')
+            self.model.pause_nodes = not self.model.pause_nodes
 
         elif event.key == pygame.K_k:
             if verbose: print('k')
