@@ -4,7 +4,7 @@ import hashlib
 from constants import *
 from message import Message
 
-class Node:
+class Node(object):
 
 	def __init__(self, x, y, grid=True):
 
@@ -12,11 +12,14 @@ class Node:
 		self.x = x
 		self.y = y
 
+		# color of node in display
+		self.color = 'cyan'
+
 		self.sk = self.create_random_string() # sk = secret key
 		self.pk = '' # pk = public key
 
 		# messages this node has received
-		self.messages = []
+		self.mailbox = []
 
 		''' Graph of nodes this node is connected to.
 
@@ -55,21 +58,26 @@ class Node:
 		# key   = ping random string
 		# value = time ping was sent
 		self.pings = {}
-		self.time_of_last_ping0 = None
+		self.prev_ping_t = time.time() - (1 / PING_FREQUENCY)*random.uniform(0, 1) # start pings at random times in period
 
-	def main_loop(self):
+	def main_loop(self, verbose=False):
 		t = time.time() # unix time, example: 1424233311.771502
+		if verbose: print('\nNode <public key>:')
+		self.color = 'cyan' # reset color
 
 		# ping on PING_FREQUENCY
 		ping = None
-		if self.time_of_last_ping0 == None \
-		or 1.0 / (t - self.time_of_last_ping0) < PING_FREQUENCY:
+		if 1.0 / (t - self.prev_ping_t) <= PING_FREQUENCY:
 			ping = self.ping()
 			self.pings = self.update_ping_list(ping, t)
-			self.time_of_last_ping = t
+			self.prev_ping_t = t
+			self.color = 'green'
+			if verbose: print('ping')
 
 		messages_to_send = self.respond_to_messages()
-		return ping, messages_to_send
+		if ping != None:
+			messages_to_send += [ping]
+		return messages_to_send
 
 	def update_ping_list(self, p, t):
 
@@ -106,32 +114,38 @@ class Node:
 		# 	'\n' + \
 		# 	'Sincerely,' + \
 		# 	'Node: %s\n' % self.pk)
-		return Message(
-			'PING!\n' + \
+		return self.send_message(
+			'PING\n' + \
 			'Send me back this random string.\n' + \
 			'%s\n' % random_string + \
 			'and sign it please.\n' + \
-			'\n' + \
-			'Sincerely,' + \
+			'Sincerely,\n' + \
 			'Node: %s\n' % self.pk)
 
 	def echo(self, m):
-		specifed_random_string_to_echo = m.m.split('\n')[1]
-		return self.send_message('ECHO\n' + specifed_random_string_to_echo + '\n' + self.pk)
+		random_string = m.m.split('\n')[2]
+		return self.send_message(
+			'ECHO\n' + \
+			'This is the string you sent me.\n' + \
+			'%s\n' % random_string + \
+			'Sincerely,\n' + \
+			'Node: %s\n' % self.pk)
 
 	def respond_to_messages(self):
 		messages_to_send = []
 		unread_messages  = []
-		for m in self.messages:
-			if m.m.startswith('PING'):
-				messages_to_send.append(self.echo(m))
+		for message in self.mailbox:
+			if message.m.startswith('PING'):
+				messages_to_send.append(self.echo(message))
+				if self.color == 'cyan':
+					self.color = 'red'
 
 				# if m.m.startswith('ECHO'):
 
 			else: # default of switch (why doesn't python have switches?)
-				unread_messages.append(m)
+				unread_messages.append(message)
 
-		self.messages = unread_messages
+		self.mailbox = unread_messages
 		return messages_to_send
 
 	def send_message(self, m, rpk=None):

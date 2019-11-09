@@ -18,6 +18,9 @@ import numpy as np
 
     DESCRIPTION:
 
+        the difference between main_old.py and main.py is that main.py has the messaging system described in TO DO.
+        main_old.py has messages with receiver_node
+
     SOURCES:
 
         https://www.pygame.org/docs/
@@ -54,17 +57,12 @@ import numpy as np
                                 if we move the devices AND THEN send the message and give the message
                                 a starting dist_travelled of SIGNAL_SPEED then ... idk ...
                                 ... i think the sender_node won't receive the message
-                                OR we could just say: if device != mdm['sender_device']
                     if dist_travelled >= R:
                         delete signal
 
                 draw signals better
 
-                    make signal ring's opaqueness increase as r approaches R
-
-                    put signal rings underneath everything else
-
-                    make node turn red, green, white right before it sends a message
+                    circles underneath everything else
 
                     why is there so many echos?
                         i think each echo is technically to everyone, and its the matching message that specifies who its for
@@ -127,7 +125,7 @@ import numpy as np
                 figure out how to get a fully connected network that is distributed evenly
                 over the entire area ... more or less
 
-                #################### these model functions to be fixed #############################
+                #################### these need to be fixed ###############################
 
                     # create devices that are stationary in the map
                     def init_static_devices(self, verbose=False):
@@ -340,15 +338,7 @@ import numpy as np
                                 print(s)
                             print('------------------------------------------------------')
 
-
-                    this was at the end of model.update()
-
-                        # update the Nodes in the network every AUTOMATA_PERIOD
-                        if (t - self.t2) > AUTOMATA_PERIOD:
-                            self.evolve_grid(verbose=True)
-                            self.t2 = t
-
-                ####################################################################################
+                ###########################################################################
 
 
             maybe use this to improve device movement
@@ -371,7 +361,6 @@ class View(object):
         self.show_controls = False # toggle control display
 
 
-
     def draw(self):
 
         # fill background
@@ -379,7 +368,8 @@ class View(object):
 
         self.draw_selected_device_range()
         self.draw_in_range_connections()
-        self.draw_signals()
+        # self.draw_pings()
+        # self.draw_echos()
         # self.draw_messages()
         # self.draw_paths_to_dst()
         self.draw_devices()
@@ -417,7 +407,7 @@ class View(object):
             y = int(SCREEN_SCALE*d.n.y)
             pygame.draw.circle(
                 self.surface,
-                pygame.Color(d.n.color),
+                pygame.Color('cyan'),
                 (x, y), 5) # (x,y), radius
 
     def draw_in_range_connections(self):
@@ -442,13 +432,6 @@ class View(object):
                 (255,0,0),
                 (x2, y2), 5) # (x,y), radius
 
-
-    def draw_messages(self):
-        for mdm in self.model.mid_delivery_messages:
-            color = 'cyan'
-            if mdm['message'].m.startswith('PING'): color = 'green'
-            if mdm['message'].m.startswith('ECHO'): color = 'red'
-            draw_message_dot(mdm, color)
     def draw_message_dot(self, mdm, color):
         sn, rn = mdm['sender_device'].n, mdm['receiver_device'].n
         dist_sn_to_rn = math.sqrt((sn.x - rn.x)**2 + (sn.y - rn.y)**2)
@@ -459,47 +442,44 @@ class View(object):
             pygame.Color(color),
             (x, y), 2) # (x,y), radius
 
-    def draw_signals(self):
-        sd = self.model.selected_device
-        sd_conns = self.model.connections[sd] if sd != None else None
-        for signal in self.model.signals:
-            # if signal['sender_device'] != sd: continue
-
-
-            # display pings sent out by sd and
-            # echoes that are bound for sd (approximately)
-            d0 = signal['sender_device']
-            if sd == None:
-                break
-            if d0 == sd:
-                if not signal['message'].m.startswith('PING'):
-                    continue
-            else:
-                # if echo thats responding to sd
-                if signal['message'].m.startswith('ECHO'):
-                    rs = signal['message'].m.split('\n')[2]
-                    if rs in sd.n.pings.keys():
-                        pass
-                    else:
-                        continue
-                else:
-                    continue
-
-            color = 'cyan'
-            if signal['message'].m.startswith('PING'): color = 'darkgreen'
-            if signal['message'].m.startswith('ECHO'): color = 'darkred'
-            self.draw_signal_ring(signal, color)
-    def draw_signal_ring(self, signal, color):
-        r = signal['dist_traveled']
-        color = pygame.Color(color)
+    def draw_message_circle(self, mdm, color, fade=True):
+        r = mdm['dist_traveled']
+        if fade:
+            non_zero_rgb_value = int(255 * ((float(R - r) / R)**10 if r < R else 0.0))
+            if color == 'darkgreen': color = (0, non_zero_rgb_value, 0)
+            if color == 'cyan':      color = (0, 0, non_zero_rgb_value)
+            if color == 'darkred':   color = (non_zero_rgb_value, 0, 0)
+        else:
+            color = pygame.Color(color)
         r = int(SCREEN_SCALE * r)
         if r > 1:
-            x = int(SCREEN_SCALE * signal['send_pt'][0])
-            y = int(SCREEN_SCALE * signal['send_pt'][1])
+            x = int(SCREEN_SCALE * mdm['send_pt' ][0])
+            y = int(SCREEN_SCALE * mdm['send_pt' ][1])
             pygame.draw.circle(
                 self.surface,
                 color,
                 (x, y), r, 1) # (x,y), radius
+
+    def draw_pings(self):
+        for mdm in self.model.mid_delivery_messages:
+            if mdm['sender_device'] != model.devices[0]: continue # just draw 1 device's ping right now
+            if mdm['message'].m.startswith('PING'):
+                self.draw_message_circle(mdm, 'darkgreen', fade=True)
+                self.draw_message_dot(mdm, 'green')
+
+    def draw_echos(self):
+        for mdm in self.model.mid_delivery_messages:
+            if mdm['receiver_device'] != model.devices[0]: continue # just draw 1 device's return echos right now
+            if mdm['message'].m.startswith('ECHO'):
+                self.draw_message_circle(mdm, 'darkred', fade=True)
+                self.draw_message_dot(mdm, 'red')
+
+    def draw_messages(self):
+        for mdm in self.model.mid_delivery_messages:
+            if not mdm['message'].m.startswith('PING') \
+            and not mdm['message'].m.startswith('ECHO'):
+                self.draw_message_circle(mdm, 'cyan', fade=True)
+                self.draw_message_dot(mdm, 'cyan')
 
     def draw_text(self, text, x, y, size, \
         text_color = (100, 100, 100), \
@@ -527,12 +507,13 @@ class Model(object):
         self.devices = self.init_moving_devices(verbose=False)
         self.connections, self.edges = self.set_connections(self.devices, verbose=False)
 
-        # list of signals that are being broadcast. Used to simulate signal time delay in simulation
-        # format: [{'sender_device':<Device>, 'dist_traveled':<float>, 'send_pt':<(float, float)>, 'message':<str>}, ...]
-        self.signals = []
+        # list of messages that are being delivered. Used just for time delay in simulation
+        # format: [(receiver_node, delivery_time, message), ...]
+        self.mid_delivery_messages = []
 
         t = time.time()
         self.t1 = t # t1 = time of previous time step (1 time step in the past)
+        self.t2 = t # t2 = time of previous cellular
 
         # window parameters / drawing
         self.show = True # show current model
@@ -546,58 +527,36 @@ class Model(object):
     def update(self, verbose=False):
 
         t = time.time()
-        # if verbose: print('%s\nt = %s' % ('-'*180, t))
+        # if verbose: print('%s\nt = %s' % ('-'*80, t))
 
-        # move message signals forward,
-        # deliver message if it's reached a node,
-        # remove it when its travelled R distance
-        signals_outside_range = []
-        for signal in self.signals:
+        # # move message signals forward,
+        # # deliver message if it's reached the receiver_node,
+        # # else keep it in the mid_delivery_messages list
+        # new_mid_delivery_messages = []
+        # for mdm in self.mid_delivery_messages:
+        #     mdm['dist_traveled'] += (SIGNAL_SPEED * (t - self.t1))
+        #     sp, rn = mdm['send_pt'], mdm['receiver_device'].n
+        #     dist_send_pt_to_rn = math.sqrt((sp[0] - rn.x)**2 + (sp[1] - rn.y)**2)
+        #     if mdm['dist_traveled'] >= dist_send_pt_to_rn: # reached receiver device
+        #         rn.messages.append(mdm['message'])
+        #     else:
+        #         new_mid_delivery_messages.append(mdm)
+        # self.mid_delivery_messages = new_mid_delivery_messages
 
-            # if signal['sender_device'] == self.selected_device:
-            #     self.print_signal(signal)
+        # # run the main loop of each node
+        # for i, d in enumerate(self.devices):
 
-            # move message forward
-            prev_signal_dist = signal['dist_traveled']
-            signal['dist_traveled'] += (SIGNAL_SPEED * (t - self.t1))
-            if signal['dist_traveled'] > R: signal['dist_traveled'] = R
+        #     if not isinstance(d, Device): continue
 
-            # deliver message if it's reached a node
-            sn, sp = signal['sender_device'].n, signal['send_pt']
-            x, y = sp[0], sp[1]
-            for d in self.devices:
-                if d != sn:
+        #     # every node send out a ping signal on and
+        #     # respond to any messages it has received
+        #     # n.print_n(i=i+1, newline_start=True)
+        #     ping, sent_messages = d.n.main_loop()
 
-                    # put the signal's message in device d's mailbox if the signal just passed d
-                    dist_sp_to_d = math.sqrt((d.n.x - x)**2 + (d.n.y - y)**2)
-                    if prev_signal_dist <= dist_sp_to_d <= signal['dist_traveled'] \
-                    and d not in signal['receiver_devices']:
-                        d.n.mailbox.append(signal['message'])
-                        signal['receiver_devices'].add(d)
-
-            # remove message that have reached the max signal range
-            if signal['dist_traveled'] == R:
-                signals_outside_range.append(signal)
-        for signal in signals_outside_range:
-            self.signals.remove(signal)
-
-        # run the main loop of each node
-        for i, d in enumerate(self.devices):
-
-            if not isinstance(d, Device): continue
-
-            # every node sends out a ping signal on a timed interval
-            # and responds to any messages it has received immediately
-            # n.print_n(i=i+1, num_nodes=len(devices), newline_start=True)
-            sent_messages = d.n.main_loop(verbose=False)#d==self.selected_device)
-            for message in sent_messages:
-                self.signals.append({
-                    'sender_device'    : d,
-                    'dist_traveled'    : 0.00,
-                    'send_pt'          : (d.n.x, d.n.y),
-                    'message'          : message,
-                    'receiver_devices' : set()
-                })
+        #     if ping != None:
+        #         self.add_message_to_mid_delivery_messages(ping, d)
+        #     for m in sent_messages:
+        #         self.add_message_to_mid_delivery_messages(m, d)
 
         ''' move the devices, and update devices, connections and edges
 
@@ -663,32 +622,15 @@ class Model(object):
             self.connections, self.edges = self.set_connections(self.devices)
 
 
+        # # update the Nodes in the network every AUTOMATA_PERIOD
+        # if (t - self.t2) > AUTOMATA_PERIOD:
+        #     self.evolve_grid(verbose=True)
+        #     self.t2 = t
+
         self.t1 = t # update t1 at end of update()
 
-    def print_signal(self, signal):
-        print('Sender Device:')
-        signal['sender_device'].print_d()
-        print('dist_traveled = %.2f' % signal['dist_traveled'])
-        print('send_pt = (%.2f, %.2f)' % (signal['send_pt'][0], signal['send_pt'][1]))
-        signal['message'].print_m()
-        print('receiver_devices:')
-        for rd in signal['receiver_devices']:
-            rd.print_d()
-        print()
-
-    # create devices that move around the map
-    def init_moving_devices(self, verbose=False):
-        devices = []
-        n_to_create = int(((N_MAX - N_MIN) / 2) + N_MIN) # create halfway between N_MIN and N_MAX
-        while n_to_create > 0:
-            n_to_create -= 1
-            devices.append(Device(devices))
-        if verbose:
-            print('Nodes:')
-            num_devices = len(devices)
-            for i, d in enumerate(devices):
-                d.print_d(num_devices, i=i+1)
-        return devices
+        #    input()
+        # sys.exit()
 
     # determine which devices are current within signal range of each other
     # {keys=devices, value={key=neighbor_device : value=distance}}
@@ -737,6 +679,31 @@ class Model(object):
             print('%d Direct Neighbors:' % len(neighbors.keys()))
             for neighbor in neighbors.keys(): neighbor.print_d(newline_start=False)
         return neighbors
+
+    # put message from device d0 in list of messages that are mid-delivery
+    def add_message_to_mid_delivery_messages(self, message, d0):
+        for neighbor, dist in self.connections[d0].items():
+            self.mid_delivery_messages.append({
+                'sender_device'    : d0,
+                'receiver_device'  : neighbor,
+                'dist_traveled'    : 0.00,
+                'send_pt'          : (d0.n.x, d0.n.y),
+                'message'          : message
+            })
+
+    # create devices that move around the map
+    def init_moving_devices(self, verbose=False):
+        devices = []
+        n_to_create = int(((N_MAX - N_MIN) / 2) + N_MIN) # create halfway between N_MIN and N_MAX
+        while n_to_create > 0:
+            n_to_create -= 1
+            devices.append(Device(devices))
+        if verbose:
+            print('Nodes:')
+            num_devices = len(devices)
+            for i, d in enumerate(devices):
+                d.print_d(num_devices, i=i+1)
+        return devices
 
 
 class Controller(object):
@@ -800,7 +767,7 @@ class Controller(object):
     # click selected device again to deselect it
     def select_or_deselect_device(self, mx, my, verbose=False):
         x, y = mx / SCREEN_SCALE, my / SCREEN_SCALE # mx and my are scaled to display, not the model
-        selected_device = self.find_closest_device(x, y, verbose=False)
+        selected_device = self.find_closest_device(x, y, verbose=True)
         if model.selected_device == None:
             return selected_device
         else:
@@ -855,7 +822,7 @@ if __name__ == '__main__':
                 pygame.quit()
                 sys.exit()
             else:
-                controller.handle_event(event, verbose=False)
+                controller.handle_event(event, verbose=True)
 
         # update the model
         model.update(verbose=True)

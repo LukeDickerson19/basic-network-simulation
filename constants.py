@@ -39,8 +39,8 @@ SCREEN_SIZE = (
 
 
 
-SIGNAL_SPEED = 3.5 # how far the signal travels per second (make sure this is faster than MAX_VEL)
-PING_FREQUENCY = 0.5 # number of pings per second
+SIGNAL_SPEED = 6.5 # how far the signal travels per second (make sure this is faster than MAX_VEL)
+PING_FREQUENCY = 0.33 # number of pings per second
 
 
 
