@@ -375,7 +375,7 @@ class View(object):
     def draw(self):
 
         # fill background
-        self.surface.fill(pygame.Color('black'))
+        self.surface.fill(pygame.Color(BACKGROUND_COLOR))
 
         self.draw_selected_device_range()
         self.draw_in_range_connections()
@@ -426,7 +426,7 @@ class View(object):
             x2, y2 = int(SCREEN_SCALE*d2.n.x), int(SCREEN_SCALE*d2.n.y)
             pygame.draw.line(
                 self.surface,
-                pygame.Color('blue'),
+                pygame.Color(CONNECTION_COLOR),
                 (x1, y1), (x2, y2), 1)
 
     def draw_paths_to_dst(self):
@@ -435,19 +435,19 @@ class View(object):
             x2, y2 = int(SCREEN_SCALE * d.dst[0]), int(SCREEN_SCALE * d.dst[1])
             pygame.draw.line(
                 self.surface,
-                (255,255,255),
+                (255, 255, 255),
                 (x1, y1), (x2, y2), 1) # (start_x, start_y), (end_x, end_y), thickness
             pygame.draw.circle(
                 self.surface,
-                (255,0,0),
+                (255, 0, 0),
                 (x2, y2), 5) # (x,y), radius
 
 
     def draw_messages(self):
         for mdm in self.model.mid_delivery_messages:
-            color = 'cyan'
-            if mdm['message'].m.startswith('PING'): color = 'green'
-            if mdm['message'].m.startswith('ECHO'): color = 'red'
+            color = DOT_MESSAGE_COLOR
+            if mdm['message'].m.startswith('PING'): color = DOT_PING_COLOR
+            if mdm['message'].m.startswith('ECHO'): color = DOT_ECHO_COLOR
             draw_message_dot(mdm, color)
     def draw_message_dot(self, mdm, color):
         sn, rn = mdm['sender_device'].n, mdm['receiver_device'].n
@@ -485,9 +485,9 @@ class View(object):
                 else:
                     continue
 
-            color = 'cyan'
-            if signal['message'].m.startswith('PING'): color = 'darkgreen'
-            if signal['message'].m.startswith('ECHO'): color = 'darkred'
+            color = SIGNAL_MESSAGE_COLOR
+            if signal['message'].m.startswith('PING'): color = SIGNAL_PING_COLOR
+            if signal['message'].m.startswith('ECHO'): color = SIGNAL_ECHO_COLOR
             self.draw_signal_ring(signal, color)
     def draw_signal_ring(self, signal, color):
         r = signal['dist_traveled']
@@ -502,8 +502,8 @@ class View(object):
                 (x, y), r, 1) # (x,y), radius
 
     def draw_text(self, text, x, y, size, \
-        text_color = (100, 100, 100), \
-        background_color = (0, 0, 0)):
+        text_color=(100, 100, 100), \
+        background_color=BACKGROUND_COLOR):
 
         # make text
         basicfont = pygame.font.SysFont(None, size)

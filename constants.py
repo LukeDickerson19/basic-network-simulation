@@ -42,7 +42,21 @@ SCREEN_SIZE = (
 SIGNAL_SPEED = 6.5 # how far the signal travels per second (make sure this is faster than MAX_VEL)
 PING_FREQUENCY = 0.33 # number of pings per second
 
-
+# Python Color Constants Module
+# https://www.webucator.com/blog/2015/03/python-color-constants-module/
+BACKGROUND_COLOR = 'black'
+NODE_DEFAULT_COLOR = 'white'
+NODE_PING_COLOR = 'red'
+NODE_ECHO_COLOR = 'green'
+NODE_MESSAGE_COLOR = 'blue'
+SIGNAL_PING_COLOR = 'darkred'
+SIGNAL_ECHO_COLOR = 'darkgreen'
+SIGNAL_MESSAGE_COLOR = 'blue'
+DOT_PING_COLOR = 'red'
+DOT_ECHO_COLOR = 'green'
+DOT_MESSAGE_COLOR = 'blue'
+CONNECTION_COLOR = 'white'
+SELECTED_DEVICE_COLOR = 'gray8' #(20, 20, 20)
 
 
 ALL_CHARS = ''.join(set(string.printable) - set(string.whitespace)) # all printable characters except white space, used for key creation
