@@ -19,6 +19,22 @@ import numpy as np
 
     DESCRIPTION:
 
+    USAGE:
+
+        
+        toggle seeing:
+            edges between nodes - w/ "c"
+            selected device's:
+                pings    - w/ "p0 *enter*"
+                echos    - w/ "e0 *enter*"
+                messages - w/ "m0 *enter*"
+            devices' in range of selected device:
+                pings    - w/ "p1 *enter*"
+                echos    - w/ "e1 *enter*"
+                messages - w/ "m1 *enter*"
+            signal rings        - w/ "r"
+            message dots        - w/ "d"            
+
     SOURCES:
 
         https://www.pygame.org/docs/
@@ -30,7 +46,7 @@ import numpy as np
 
     IDEAS:
 
-        if the first neighbor can verify the sender is who they say they are, they can pass on that verification, and then verify they're who THEY say they are, and the 2nd neighbor can verify the same, ... and a path can be built
+        if the first neighpbor can verify the sender is who they say they are, they can pass on that verification, and then verify they're who THEY say they are, and the 2nd neighbor can verify the same, ... and a path can be built
 
         what if you used the position triangluation to verify that someone isn't using a server farm to run a bunch of nodes
         in order for nodes to count they need to be spread out (and moving frequenty? what about desktops) to exibit normal device behavior
@@ -45,15 +61,8 @@ import numpy as np
 
                     something is wrong with the way the colors of the signals are displayed.
                         pings's appear green when they should be red
-                        make it so you can toggle seeing
-                            selected device's:
-                                pings
-                                echos
-                                messages
-                            devices' in range of selected device:
-                                pings
-                                echos
-                                messages
+
+
 
                     make signal ring's opaqueness increase as r approaches R
                         apparently this is much harder than it seems because
@@ -73,16 +82,9 @@ import numpy as np
                                         we need to find the intercept of 2 overlapping circles
                                             (w/ known coordinates and radii)
 
-                    put signal rings underneath everything else
-
                     make node turn red, green, white right before it sends a message
                         give them a time delay
                             perhaps fade from signal_color to NODE_DEFAULT_COLOR after signal is sent
-
-                    why is there so many echos?
-                        i think each echo is technically to everyone, and its the matching message that specifies who its for
-
-                        make it so the ping
 
                     make each node have a number in its circle in the display (just its index in the list of all nodes)
 
@@ -91,10 +93,6 @@ import numpy as np
                         when you click on a node, information appears about
                         its public key
                         its messages list
-
-                        make it so you can toggle viewing that nodes range
-
-                        make it so you can toggle drawing connection lines to this node's direct neighbors
 
                         make it so you can change R (and maybe other constants) mid simulation
 
@@ -375,15 +373,23 @@ import numpy as np
 
 class View(object):
 
-    def __init__(self, model, show_view=True):
+    def __init__(self, model):
 
         self.model = model
         self.screen = pygame.display.set_mode(SCREEN_SIZE) # a pygame screen
         self.surface = pygame.Surface(SCREEN_SIZE) # a pygame surface is the thing you draw on
 
-        self.show_view = show_view # toggle display
         self.show_controls = False # toggle control display
 
+        self.c = True # draw connections
+        self.d = True # draw message dots
+        self.r = True # draw signal rings
+        self.p0 = False # draw pings of selected device
+        self.p1 = False # draw pings of direct neighbors of selected device
+        self.e0 = False # draw echos of selected device
+        self.e1 = False # draw echos of direct neighbors of selected device
+        self.m0 = False # draw messages of selected device
+        self.m1 = False # draw messages of direct neighbors of selected device
 
 
     def draw(self):
@@ -391,10 +397,14 @@ class View(object):
         # fill background
         self.surface.fill(pygame.Color(BACKGROUND_COLOR))
 
+
         self.draw_selected_device_range()
-        self.draw_in_range_connections()
-        self.draw_signals()
-        self.draw_messages()
+        if self.model.selected_device != None:
+            if self.r: self.draw_signals()
+        if self.c:
+            self.draw_in_range_connections()
+        if self.model.selected_device != None:
+            if self.d: self.draw_messages()
         # self.draw_paths_to_dst()
         self.draw_devices()
 
@@ -461,20 +471,52 @@ class View(object):
     def draw_messages(self):
         sd = self.model.selected_device
         for signal in self.model.signals:
-            if signal['sender_device'] != sd: continue
-            if not signal['message'].m.startswith('ECHO'): continue
+
+            # filter which dots to draw
+            # if signal['sender_device'] != sd: continue
+            # if not signal['message'].m.startswith('ECHO'): continue
+            d0 = signal['sender_device']
+            if not (
+                (
+                    d0 == sd and (
+                        (self.m0) or
+                        (self.p0 and signal['message'].m.startswith('PING')) or
+                        (self.e0 and signal['message'].m.startswith('ECHO'))
+                    )
+                ) or (
+                    d0 in self.model.connections[sd] and (
+                        (self.m1) or
+                        (self.p1 and signal['message'].m.startswith('PING')) or
+                        (self.e1 and signal['message'].m.startswith('ECHO'))
+                    )
+                )
+            ): continue
+
             color = DOT_MESSAGE_COLOR
             if signal['message'].m.startswith('PING'): color = DOT_PING_COLOR
             if signal['message'].m.startswith('ECHO'): color = DOT_ECHO_COLOR
-            self.draw_message_dot(signal, color)
-    def draw_message_dot(self, signal, color):
+            self.draw_message_dot(signal, color, sd)
+    def draw_message_dot(self, signal, color, sd):
         sn, sp = signal['sender_device'].n, signal['send_pt']
         cx, cy, r = sp[0], sp[1], signal['dist_traveled'] # circle variables
-        for edge in self.model.edges:
-            edge = tuple(edge)
-            n1, n2 = edge[0].n, edge[1].n
+        for _edge in self.model.edges:
+            edge = tuple(_edge)
+
+            # filter which dots to draw
+            if sd not in edge: continue # only draw signals going to/from sd
+            if signal['message'].m.startswith('ECHO'): # only draw echo dot to intended receiver_node
+                nd = edge[0] if edge[1] == sd else edge[1] # nd = neighboring device (of selected device)
+                rd = nd if sn == sd.n else sd # rd = receiver device
+                rn_id = signal['message'].m.split('\n')[1].split(' ')[2] # receiver node according to echo message
+                if rd.n.sk != rn_id: continue
+                if {rd, signal['sender_device']} != _edge: continue # only draw on the edge with both sender and receiver device
+            if signal['message'].m.startswith('PING'):
+                if signal['sender_device'] != sd: # if a neighboring device is sending the ping
+                    # only draw it on the edge between that neighboring device and sd
+                    if {signal['sender_device'], sd} != _edge: continue
 
             # if just one, XOR, of the connection endpoints is within the signal ring
+            n1, n2 = edge[0].n, edge[1].n
             dist_sp_to_d1 = math.sqrt((n1.x - cx)**2 + (n1.y - cy)**2)
             d1_in_signal_ring = signal['dist_traveled'] >= dist_sp_to_d1
             dist_sp_to_d2 = math.sqrt((n2.x - cx)**2 + (n2.y - cy)**2)
@@ -542,57 +584,83 @@ class View(object):
                     pygame.Color(color),
                     (x, y), 3) # (x,y), radius
 
-
-        # sn, rn = mdm['sender_device'].n, mdm['receiver_device'].n
-        # dist_sn_to_rn = math.sqrt((sn.x - rn.x)**2 + (sn.y - rn.y)**2)
-        # x = int(SCREEN_SCALE * ((mdm['dist_traveled'] / dist_sn_to_rn)*(rn.x - sn.x) + sn.x))
-        # y = int(SCREEN_SCALE * ((mdm['dist_traveled'] / dist_sn_to_rn)*(rn.y - sn.y) + sn.y))
-        # pygame.draw.circle(
-        #     self.surface,
-        #     pygame.Color(color),
-        #     (x, y), 2) # (x,y), radius
-
     def draw_signals(self):
         sd = self.model.selected_device
         sd_conns = self.model.connections[sd] if sd != None else None
         for signal in self.model.signals:
-            # if signal['sender_device'] != sd: continue
 
-
-            # display pings sent out by sd and
-            # echoes that are bound for sd (approximately)
             d0 = signal['sender_device']
-            if sd == None:
-                break
-            if d0 == sd:
-                if not signal['message'].m.startswith('PING'):
-                    continue
-            else:
-                # if echo thats responding to sd
-                if signal['message'].m.startswith('ECHO'):
-                    rs = signal['message'].m.split('\n')[2]
-                    if rs in sd.n.pings.keys():
+            if not (
+                (
+                    d0 == sd and (
+                        (self.m0) or
+                        (self.p0 and signal['message'].m.startswith('PING')) or
+                        (self.e0 and signal['message'].m.startswith('ECHO'))
+                    )
+                ) or (
+                    d0 in self.model.connections[sd] and (
+                        (self.m1) or
+                        (self.p1 and signal['message'].m.startswith('PING')) or
+                        (self.e1 and signal['message'].m.startswith('ECHO'))
+                    )
+                )
+            ): continue
+
+            if signal['message'].m.startswith('ECHO'): # only draw echo dot to intended receiver_node
+                rn_id = signal['message'].m.split('\n')[1].split(' ')[2] # rn_id = receiver node id
+                if d0 == sd:
+                    pass # draw signal for all echos
+                else:
+                    # only draw signal if the echo is intended for sd
+                    if rn_id == sd.n.sk:
                         pass
                     else:
                         continue
-                else:
-                    continue
 
             color = SIGNAL_MESSAGE_COLOR
             if signal['message'].m.startswith('PING'): color = SIGNAL_PING_COLOR
             if signal['message'].m.startswith('ECHO'): color = SIGNAL_ECHO_COLOR
-            self.draw_signal_ring(signal, color)
-    def draw_signal_ring(self, signal, color):
+            self.draw_signal_ring(signal, color, sd, fade=True)
+    def draw_signal_ring(self, signal, color, sd, fade=False):
         r = signal['dist_traveled']
-        color = pygame.Color(color)
-        r = int(SCREEN_SCALE * r)
-        if r > 1:
-            x = int(SCREEN_SCALE * signal['send_pt'][0])
-            y = int(SCREEN_SCALE * signal['send_pt'][1])
-            pygame.draw.circle(
-                self.surface,
-                color,
-                (x, y), r, 1) # (x,y), radius
+        if fade:
+            color = pygame.Color(color)
+            r = int(SCREEN_SCALE * r)
+            if r > 1:
+                x = int(SCREEN_SCALE * signal['send_pt'][0])
+                y = int(SCREEN_SCALE * signal['send_pt'][1])
+                rect = [x - r, y - r, 2*r, 2*r]
+
+                sd.n.x, sd.n.y, R
+                if dist_sd_send_pt + r > R:
+                    # signal all inside R, no intersect
+                    # dist_sd_sent_pt is always <=R,
+                    # b/c we're never going to draw the signal ring for a device outside of sd's range
+                    a1, a2 = 0, 2*np.pi
+                else: # there is an intersect
+                    pass
+
+                # signal is either entirely in circle()
+                a1 = np.pi
+                a2 = np.pi*2
+                
+
+
+                pygame.draw.arc(
+                    self.surface,
+                    color,
+                    rect,
+                    a1, a2, 1) # (x,y), radius
+        else:
+            color = pygame.Color(color)
+            r = int(SCREEN_SCALE * r)
+            if r > 1:
+                x = int(SCREEN_SCALE * signal['send_pt'][0])
+                y = int(SCREEN_SCALE * signal['send_pt'][1])
+                pygame.draw.circle(
+                    self.surface,
+                    color,
+                    (x, y), r, 1) # (x,y), radius
 
     def draw_text(self, text, x, y, size, \
         text_color=(100, 100, 100), \
@@ -652,28 +720,16 @@ class Model(object):
             signals_outside_range = []
             for signal in self.signals:
 
-                # if signal['sender_device'] == self.selected_device:
-                #     # print signal
-                #     print('Sender Device:')
-                #     signal['sender_device'].print_d()
-                #     print('dist_traveled = %.2f' % signal['dist_traveled'])
-                #     print('send_pt = (%.2f, %.2f)' % (signal['send_pt'][0], signal['send_pt'][1]))
-                #     signal['message'].print_m()
-                #     print('receiver_devices:')
-                #     for rd in signal['receiver_devices']:
-                #         rd.print_d()
-                #     print()
-
                 # move message forward
                 prev_signal_dist = signal['dist_traveled']
                 signal['dist_traveled'] += (SIGNAL_SPEED * (t - self.t1))
                 if signal['dist_traveled'] > R: signal['dist_traveled'] = R
 
                 # deliver message if it's reached a node
-                sn, sp = signal['sender_device'].n, signal['send_pt']
+                sd, sp = signal['sender_device'], signal['send_pt']
                 x, y = sp[0], sp[1]
                 for d in self.devices:
-                    if d != sn:
+                    if d != sd:
 
                         # put the signal's message in device d's mailbox if the signal just passed d
                         dist_sp_to_d = math.sqrt((d.n.x - x)**2 + (d.n.y - y)**2)
@@ -702,8 +758,8 @@ class Model(object):
                         'sender_device'    : d,
                         'dist_traveled'    : 0.00,
                         'send_pt'          : (d.n.x, d.n.y),
-                        'message'          : message,
-                        'receiver_devices' : set()
+                        'message'          : message, # this  
+                        'receiver_devices' : set() # ensures that a signal doesn't pass a node twice
                     })
 
         ''' move the devices, and update devices, connections and edges
@@ -840,11 +896,13 @@ class Model(object):
 
 class Controller(object):
 
+    # NOTE mouse must be over GUI for keyboard commands to be noticed
     def __init__(self, model, view):
 
         self.model = model
         self.view = view
         self.paused = False
+        self.buffer = ''
 
 
     # respond to any user input
@@ -868,6 +926,7 @@ class Controller(object):
                     if verbose: print('mouse right click') # 2 finger click on Mac
                 else:
                     if verbose: print('event.button = %d' % event.button)
+
         elif event.key == pygame.K_SPACE:
             if verbose: print('space bar')
             self.model.pause_devices = not self.model.pause_devices
@@ -876,13 +935,41 @@ class Controller(object):
             if verbose: print('n')
             self.model.pause_nodes = not self.model.pause_nodes
 
-        elif event.key == pygame.K_k:
-            if verbose: print('k')
-            view.show_controls = not view.show_controls
+        elif event.key == pygame.K_d:
+            if verbose: print('d')
+            self.view.d = not self.view.d # toggle draw message dots
 
-        elif event.key == pygame.K_v:
-            if verbose: print('v')
-            view.show_view = not view.show_view
+        elif event.key == pygame.K_r:
+            if verbose: print('r')
+            self.view.r = not self.view.r # toggle draw signal rings
+
+        elif event.key == pygame.K_c:
+            if verbose: print('c')
+            self.view.c = not self.view.c # toggle draw connection lines
+
+        elif event.key == pygame.K_RETURN:
+            print('self.buffer = %s' % self.buffer)
+            if self.buffer == 'p0':
+                self.view.p0 = not self.view.p0
+                if verbose: print('p0 = %s' % self.view.p0)
+            elif self.buffer == 'p1':
+                self.view.p1 = not self.view.p1
+                if verbose: print('p1 = %s' % self.view.p1)
+            elif self.buffer == 'e0':
+                self.view.e0 = not self.view.e0
+                if verbose: print('e0 = %s' % self.view.p1)
+            elif self.buffer == 'e1':
+                self.view.e1 = not self.view.e1
+                if verbose: print('e1 = %s' % self.view.e1)
+            elif self.buffer == 'm0':
+                self.view.m0 = not self.view.m0
+                if verbose: print('m0 = %s' % self.view.m0)
+            elif self.buffer == 'm1':
+                self.view.m1 = not self.view.m1
+                if verbose: print('m1 = %s' % self.view.m0)
+            else:
+                if verbose: print('unknown buffer: %s' % self.buffer)
+            self.buffer = ''
 
         elif event.key == pygame.K_UP:
             if verbose: print('up arrow')
@@ -892,7 +979,12 @@ class Controller(object):
             if verbose: print('left arrow')
         elif event.key == pygame.K_RIGHT:
             if verbose: print('right arrow')
-        else: pass
+        else:
+            # print(event.key)
+            # print('[%s]' %event.unicode)
+            # print()
+            self.buffer += event.unicode
+            print(self.buffer, end="\r", flush=True)
 
         # # another way to do it, gets keys currently pressed
         # keys = pygame.key.get_pressed()  # checking pressed keys
@@ -935,7 +1027,7 @@ if __name__ == '__main__':
     # pygame setup
     pygame.init()
     model = Model()
-    view = View(model, show_view=True)
+    view = View(model)
     controller = Controller(model, view)
 
     # frame rate variables
@@ -958,15 +1050,13 @@ if __name__ == '__main__':
                 pygame.quit()
                 sys.exit()
             else:
-                controller.handle_event(event, verbose=False)
+                controller.handle_event(event, verbose=True)
 
         # update the model
         model.update(verbose=True)
 
         # display the view
-        if view.show_view:
-            view.draw()
-            view.screen.blit(view.surface, (0,0))
-            pygame.display.update()
-
-            # time.sleep(1.0) # control frame rate (in seconds)
+        view.draw()
+        view.screen.blit(view.surface, (0,0))
+        pygame.display.update()
+        # time.sleep(1.0) # control frame rate (in seconds)

@@ -62,19 +62,20 @@ class Node(object):
 
 	def main_loop(self, verbose=False):
 		t = time.time() # unix time, example: 1424233311.771502
-		if verbose: print('\nNode <public key>:')
+		# if verbose: print('\nNode %s:' % self.sk)
 		self.color = NODE_DEFAULT_COLOR # reset color
 
 		# ping on PING_FREQUENCY
 		ping = None
 		if 1.0 / (t - self.prev_ping_t) <= PING_FREQUENCY:
-			ping = self.ping()
+			ping = self.ping(verbose=verbose)
 			self.pings = self.update_ping_list(ping, t)
 			self.prev_ping_t = t
 			self.color = NODE_PING_COLOR
-			if verbose: print('ping')
 
-		messages_to_send = self.respond_to_messages()
+			if verbose: print('hi %s' % time.ctime(t))
+			if verbose: print('%d messages' % len(self.mailbox))
+		messages_to_send = self.respond_to_messages(verbose=verbose)
 		if ping != None:
 			messages_to_send += [ping]
 		return messages_to_send
@@ -82,7 +83,7 @@ class Node(object):
 	def update_ping_list(self, p, t):
 
 		# save most recent ping
-		rs = p.m.split('\n')[2] # rs = random string of ping
+		rs = p.m.split('\n')[3] # rs = random string of ping
 		self.pings[rs] = t
 
 		# trim old pings that are out of range R
@@ -97,13 +98,20 @@ class Node(object):
 
 		return pings
 
-	def create_random_string(self, string_length=256):
+	def create_random_string(self, string_length=10):#256):
 		return ''.join(
 			random.choice(ALL_CHARS) for i in range(string_length))
 
-	def ping(self):
+	def ping(self, verbose=False):
 		random_string = self.create_random_string()
-		# return Message(
+		m = 'PING\n' + \
+			'Hi,\n' + \
+			'Send me back this random string.\n' + \
+			'%s\n' % random_string + \
+			'and sign it please.\n' + \
+			'Sincerely,\n' + \
+			'Node: %s\n' % self.sk
+		# m = \
 		# 	'PING!\n' + \
 		# 	'Hi Node: %s\n' %  + \
 		# 	'This is the random string you sent me.\n' + \
@@ -114,33 +122,44 @@ class Node(object):
 		# 	'\n' + \
 		# 	'Sincerely,' + \
 		# 	'Node: %s\n' % self.pk)
-		return self.send_message(
-			'PING\n' + \
-			'Send me back this random string.\n' + \
-			'%s\n' % random_string + \
-			'and sign it please.\n' + \
-			'Sincerely,\n' + \
-			'Node: %s\n' % self.pk)
+		if verbose:
+			print(time.ctime())
+			print('MY')
+			print(m)
+		return self.send_message(m)
 
-	def echo(self, m):
-		random_string = m.m.split('\n')[2]
-		return self.send_message(
-			'ECHO\n' + \
+	def echo(self, m, verbose=False):
+		sender_node = m.m.split('\n')[-2].split(' ')[1]
+		random_string = m.m.split('\n')[3]
+		m = 'ECHO\n' + \
+			'Hi Node: %s\n' % sender_node + \
 			'This is the string you sent me.\n' + \
 			'%s\n' % random_string + \
 			'Sincerely,\n' + \
-			'Node: %s\n' % self.pk)
+			'Node: %s\n' % self.sk
+		# putting sender_node in echo is used to only draw the echo dot to sender_node
+		if verbose:
+			print(time.ctime())
+			print('MY')
+			print(m)
+		return self.send_message(m)
 
-	def respond_to_messages(self):
+	def respond_to_messages(self, verbose=False):
 		messages_to_send = []
 		unread_messages  = []
-		for message in self.mailbox:
+		for i, message in enumerate(self.mailbox):
 			if message.m.startswith('PING'):
-				messages_to_send.append(self.echo(message))
+				if verbose:
+					print(time.ctime())
+					print('message %d out of %d messages in mailbox' % (i, len(self.mailbox)))
+					print('THEIR')
+					print(message.m)
+				messages_to_send.append(self.echo(message, verbose=verbose))
 				if self.color == NODE_DEFAULT_COLOR:
 					self.color = NODE_ECHO_COLOR
 
-				# if m.m.startswith('ECHO'):
+			elif message.m.startswith('ECHO'):
+				pass
 
 			else: # default of switch (why doesn't python have switches?)
 				unread_messages.append(message)

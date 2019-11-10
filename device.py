@@ -33,6 +33,7 @@ class Device(object):
         # print('src = (%.4f, %.4f)' % (self.src[0], self.src[1]))
         self.n = Node(self.src[0], self.src[1], grid=False)
 
+
     def set_source_and_destination(self, devices):
 
         # pick a random side of the map to start the device at
