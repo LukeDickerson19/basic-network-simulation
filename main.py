@@ -98,15 +98,6 @@ import numpy as np
 
                     make it so you can send a message manually from one node to another
 
-                    make it so you can toggle drawing all connection lines between nodes (dark blue)
-                    make it so pings are sent out as green line segments along the connection line
-                    make it so echos are sent out as red   line segments along the connection line
-
-                    make it so you can toggle drawing messages as expanding circles
-                        pings are dark green circles
-                        echos are dark red circles
-                        messages are dark blue circles
-
                 self.model.selected_device
                     view pings, incoming echoes, outgoing/incoming messages
 
@@ -622,39 +613,66 @@ class View(object):
             if signal['message'].m.startswith('ECHO'): color = SIGNAL_ECHO_COLOR
             self.draw_signal_ring(signal, color, sd, fade=True)
     def draw_signal_ring(self, signal, color, sd, fade=False):
-        r = signal['dist_traveled']
         if fade:
-            color = pygame.Color(color)
-            r = int(SCREEN_SCALE * r)
-            if r > 1:
-                x = int(SCREEN_SCALE * signal['send_pt'][0])
-                y = int(SCREEN_SCALE * signal['send_pt'][1])
-                rect = [x - r, y - r, 2*r, 2*r]
-
-                sd.n.x, sd.n.y, R
-                if dist_sd_send_pt + r > R:
+            r = signal['dist_traveled']
+            if int(SCREEN_SCALE * r) > 1:
+                x = signal['send_pt'][0]
+                y = signal['send_pt'][1]
+                dx, dy = sd.n.x - x, sd.n.y - y
+                dist_sd_to_send_pt = math.sqrt(dx**2 + dy**2)
+                if dist_sd_to_send_pt + r <= R:
                     # signal all inside R, no intersect
                     # dist_sd_sent_pt is always <=R,
                     # b/c we're never going to draw the signal ring for a device outside of sd's range
-                    a1, a2 = 0, 2*np.pi
+
+                    r = int(SCREEN_SCALE * r)
+                    x = int(SCREEN_SCALE * x)
+                    y = int(SCREEN_SCALE * y)
+
+                    color = pygame.Color(color)
+
+                    pygame.draw.circle(
+                        self.surface,
+                        color,
+                        (x, y), r, 1) # (x,y), radius
+
                 else: # there is an intersect
-                    pass
 
-                # signal is either entirely in circle()
-                a1 = np.pi
-                a2 = np.pi*2
-                
+                    theta1 = np.arctan2(-dy, -dx)# + np.pi
+                    theta2 = np.pi - np.arccos((r**2 + dist_sd_to_send_pt**2 - R**2) / (2*r*dist_sd_to_send_pt))
+                    # print(r, R, theta1)#, theta2)
+
+                    a1 = theta1# + theta2
+                    a2 = theta1 - theta2
+
+                    r = int(SCREEN_SCALE * r)
+                    x = int(SCREEN_SCALE * x)
+                    y = int(SCREEN_SCALE * y)
+                    rect = [x - r, y - r, 2*r, 2*r]
+                    
+                    # pygame.draw.line(
+                    #     self.surface,
+                    #     (255,255,255),
+                    #     (x, y),
+                    #     (x - r*np.cos(theta1),
+                    #     y - r*np.sin(theta1)), 4) # (start_x, start_y), (end_x, end_y), thickness
+
+                    pygame.draw.arc(
+                        self.surface,
+                        pygame.Color('red'),
+                        rect,
+                        0, a1, 1) # (x,y), radius
+                    # pygame.draw.arc(
+                    #     self.surface,
+                    #     pygame.Color('blue'),
+                    #     rect,
+                    #     a2, a1, 1) # (x,y), radius
 
 
-                pygame.draw.arc(
-                    self.surface,
-                    color,
-                    rect,
-                    a1, a2, 1) # (x,y), radius
         else:
             color = pygame.Color(color)
-            r = int(SCREEN_SCALE * r)
-            if r > 1:
+            r = int(SCREEN_SCALE * signal['dist_traveled'])
+            if int(SCREEN_SCALE * r) > 1:
                 x = int(SCREEN_SCALE * signal['send_pt'][0])
                 y = int(SCREEN_SCALE * signal['send_pt'][1])
                 pygame.draw.circle(
