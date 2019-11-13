@@ -1,6 +1,7 @@
 import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
+from pygame import gfxdraw
 import time
 import copy
 import sys
@@ -21,7 +22,7 @@ import numpy as np
 
     USAGE:
 
-        
+
         toggle seeing:
             edges between nodes - w/ "c"
             selected device's:
@@ -33,7 +34,7 @@ import numpy as np
                 echos    - w/ "e1 *enter*"
                 messages - w/ "m1 *enter*"
             signal rings        - w/ "r"
-            message dots        - w/ "d"            
+            message dots        - w/ "d"
 
     SOURCES:
 
@@ -75,7 +76,7 @@ import numpy as np
 
                                     so instead of creating a circle we would need
                                     to create 2 arcs. 1 arc fades to
-                                        BACKGROUND_COLOR and the other fades to 
+                                        BACKGROUND_COLOR and the other fades to
                                         SELECTED_DEVICE_COLOR
 
                                         to find the 2 angles where the arcs are separated
@@ -112,8 +113,14 @@ import numpy as np
 
                 manually send message to another node
 
-
         EVENTUALLY:
+
+            is gfxdraw faster?
+                they used it here:
+                    https://stackoverflow.com/questions/27108810/pygame-draw-arc-completion-bug-or-just-me
+
+            maybe pygame clock is better than time.time()
+                clock = pygame.time.Clock()
 
             model could probably be made faster if we didn't copy over so much data
                 its done to avoid messing up the iteration by deleting during an iteration though
@@ -399,6 +406,21 @@ class View(object):
         # self.draw_paths_to_dst()
         self.draw_devices()
 
+        x, y = int(SCREEN_SIZE[0] / 2), int(SCREEN_SIZE[1] / 2)
+        RED = pygame.Color('red')
+        r1 = 10
+        r2 = 20
+        r3 = 30
+        r4 = 40
+        q1 = np.pi/4
+        q2 = 3 * np.pi/4
+        q3 = -3 * np.pi/4
+        q4 = -np.pi/4
+        pygame.draw.arc(self.surface, RED, [x-r1, y-r1, 2*r1, 2*r1], q1, 0, 3)
+        pygame.draw.arc(self.surface, RED, [x-r2, y-r2, 2*r2, 2*r2], q2, 0, 3)
+        pygame.draw.arc(self.surface, RED, [x-r3, y-r3, 2*r3, 2*r3], q3, 0, 3)
+        pygame.draw.arc(self.surface, RED, [x-r4, y-r4, 2*r4, 2*r4], q4, 0, 3)
+
         # # example shapes
         # pygame.draw.circle(self.surface, pygame.Color('green'), (250,250), 10) # (x,y), radius
         # pygame.draw.line(self.surface,   (255,255,255), (310, 320), (330, 340), 4) # (start_x, start_y), (end_x, end_y), thickness
@@ -620,7 +642,7 @@ class View(object):
                 y = signal['send_pt'][1]
                 dx, dy = x - sd.n.x, y - sd.n.y
                 dist_sd_to_send_pt = math.sqrt(dx**2 + dy**2)
-                if dist_sd_to_send_pt + r <= R:
+                if False:#dist_sd_to_send_pt + r <= R:
                     # signal all inside R, no intersect
                     # dist_sd_sent_pt is always <=R,
                     # b/c we're never going to draw the signal ring for a device outside of sd's range
@@ -642,25 +664,28 @@ class View(object):
                     print('(x, y) = (%.4f, %.4f)' % (x, y))
                     print('(dx, dy) = (%.4f, %.4f)' % (dx, dy))
                     theta1 = np.arctan2(dy, dx)# + np.pi
-                    print('theta1 = %.4f' % theta1)
-                    theta1 = theta1 % (np.pi)
+                    print('theta1 = %.4f' % (theta1 * 180 / np.pi))
+                    # theta1 = (theta1 % (2*np.pi)) % (np.pi / 2)
+                    # print('pi / 2 = %.4f' % (np.pi / 2))
+
                     # if theta1 > np.pi / 2:
                     #     theta1 = np.pi - theta1
                     # elif theta1 < -np.pi / 2:
                     #     theta1 = -np.pi - theta1
                     # theta1 = theta1 - np.pi if abs(theta1) > np.pi / 2 else theta1
-                    print('theta1 = %.4f' % theta1)
-                    theta2 = np.pi - np.arccos((r**2 + dist_sd_to_send_pt**2 - R**2) / (2*r*dist_sd_to_send_pt))
+                    # print('theta1 = %.4f' % (theta1 * 180 / np.pi))
+                    # theta2 = np.pi - np.arccos((r**2 + dist_sd_to_send_pt**2 - R**2) / (2*r*dist_sd_to_send_pt))
                     # print(r, R, theta1)#, theta2)
 
-                    a1 = theta1# + theta2
-                    a2 = theta1 - theta2
+                    # a1 = theta1 + theta2
+                    # a2 = theta1 - theta2
 
                     r = int(SCREEN_SCALE * r)
                     x = int(SCREEN_SCALE * x)
                     y = int(SCREEN_SCALE * y)
-                    rect = [x - r, y - r, 2*r, 2*r]
-                    
+                    # rect = [x - r, y - r, 2*r, 2*r]
+                    rect = [SCREEN_SCALE * sd.n.x - r, SCREEN_SCALE * sd.n.y - r, 2*r, 2*r]
+
                     pygame.draw.line(
                         self.surface,
                         (0,255,255),
@@ -668,11 +693,41 @@ class View(object):
                         (x + r*np.cos(theta1),
                         y + r*np.sin(theta1)), 4) # (start_x, start_y), (end_x, end_y), thickness
 
+                    # if theta1 < 0:
+                    #     print('f')
+                    #     start_angle = -theta1
+                    #     stop_angle = 0
+                    # else:
+                    #     print('g')
+                    #     start_angle = 0
+                    #     stop_angle = -theta1
+                    # theta1 = abs(theta1)
+                    if theta1 > 0:
+                        start_angle = -theta1
+                        stop_angle = 0
+                    else:
+                        start_angle = 0
+                        stop_angle = -theta1
+                    print('start_angle = %.4f' % (start_angle * 180 / np.pi))
+                    print('stop_angle = %.4f' % (stop_angle * 180 / np.pi))
+
+                    # start_angle = -theta1 if theta1 > 0 else theta1
+                    # stop_angle = 0
+                    # print('start_angle = %.4f' % (start_angle * 180 / np.pi))
+                    # print('stop_angle = %.4f' % (stop_angle * 180 / np.pi))
+
+
                     pygame.draw.arc(
                         self.surface,
                         pygame.Color('red'),
                         rect,
-                        0, a1, 1) # (x,y), radius
+                        start_angle, stop_angle, 3) # (x,y), radius
+                    # gfxdraw.arc(
+                    #     self.surface,
+                    #     pygame.Color('red'),
+                    #     rect,
+                    #     start_angle, stop_angle, 3) # (x,y), radius
+
                     # pygame.draw.arc(
                     #     self.surface,
                     #     pygame.Color('blue'),
@@ -744,7 +799,7 @@ class Model(object):
 
         # move message signals forward,
         # deliver message if it's reached a node,
-        # remove it when its travelled R 
+        # remove it when its travelled R
         if not self.pause_nodes:
             signals_outside_range = []
             for signal in self.signals:
@@ -787,7 +842,7 @@ class Model(object):
                         'sender_device'    : d,
                         'dist_traveled'    : 0.00,
                         'send_pt'          : (d.n.x, d.n.y),
-                        'message'          : message, # this  
+                        'message'          : message, # this
                         'receiver_devices' : set() # ensures that a signal doesn't pass a node twice
                     })
 
