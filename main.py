@@ -618,7 +618,7 @@ class View(object):
             if int(SCREEN_SCALE * r) > 1:
                 x = signal['send_pt'][0]
                 y = signal['send_pt'][1]
-                dx, dy = sd.n.x - x, sd.n.y - y
+                dx, dy = x - sd.n.x, y - sd.n.y
                 dist_sd_to_send_pt = math.sqrt(dx**2 + dy**2)
                 if dist_sd_to_send_pt + r <= R:
                     # signal all inside R, no intersect
@@ -638,7 +638,18 @@ class View(object):
 
                 else: # there is an intersect
 
-                    theta1 = np.arctan2(-dy, -dx)# + np.pi
+                    print('\nsd = (%.4f, %.4f)' % (sd.n.x, sd.n.y))
+                    print('(x, y) = (%.4f, %.4f)' % (x, y))
+                    print('(dx, dy) = (%.4f, %.4f)' % (dx, dy))
+                    theta1 = np.arctan2(dy, dx)# + np.pi
+                    print('theta1 = %.4f' % theta1)
+                    theta1 = theta1 % (np.pi)
+                    # if theta1 > np.pi / 2:
+                    #     theta1 = np.pi - theta1
+                    # elif theta1 < -np.pi / 2:
+                    #     theta1 = -np.pi - theta1
+                    # theta1 = theta1 - np.pi if abs(theta1) > np.pi / 2 else theta1
+                    print('theta1 = %.4f' % theta1)
                     theta2 = np.pi - np.arccos((r**2 + dist_sd_to_send_pt**2 - R**2) / (2*r*dist_sd_to_send_pt))
                     # print(r, R, theta1)#, theta2)
 
@@ -650,12 +661,12 @@ class View(object):
                     y = int(SCREEN_SCALE * y)
                     rect = [x - r, y - r, 2*r, 2*r]
                     
-                    # pygame.draw.line(
-                    #     self.surface,
-                    #     (255,255,255),
-                    #     (x, y),
-                    #     (x - r*np.cos(theta1),
-                    #     y - r*np.sin(theta1)), 4) # (start_x, start_y), (end_x, end_y), thickness
+                    pygame.draw.line(
+                        self.surface,
+                        (0,255,255),
+                        (x, y),
+                        (x + r*np.cos(theta1),
+                        y + r*np.sin(theta1)), 4) # (start_x, start_y), (end_x, end_y), thickness
 
                     pygame.draw.arc(
                         self.surface,
