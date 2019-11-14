@@ -62,6 +62,8 @@ CONNECTION_COLOR = 'white'
 SELECTED_DEVICE_COLOR = 'gray8' #(20, 20, 20)
 
 
+SIGNAL_RING_THICKNESS = 3
+
 ALL_CHARS = ''.join(set(string.printable) - set(string.whitespace)) # all printable characters except white space, used for key creation
 # source: https://docs.python.org/3/library/string.html
 
