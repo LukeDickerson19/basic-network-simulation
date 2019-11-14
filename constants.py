@@ -44,22 +44,28 @@ PING_FREQUENCY = 0.20#0.33 # number of pings per second
 
 # Python Color Constants Module
 # https://www.webucator.com/blog/2015/03/python-color-constants-module/
-_ping = 'red'
-_echo = 'green'
-_message = 'blue'
-BACKGROUND_COLOR = 'black'
-NODE_DEFAULT_COLOR = 'white'
+_ping = ('red', (255, 0, 0))
+_echo = ('green', (0, 255, 0))
+_message = ('blue', (0, 0, 255))
+BACKGROUND_COLOR = ('black', (0, 0, 0))
+NODE_DEFAULT_COLOR = ('white', (255, 255, 255))
 NODE_PING_COLOR = _ping
 NODE_ECHO_COLOR = _echo
 NODE_MESSAGE_COLOR = _message
-SIGNAL_PING_COLOR = 'dark' + _ping
-SIGNAL_ECHO_COLOR = 'dark' + _echo
+SIGNAL_PING_COLOR = ('dark' + _ping[0], (
+	155 if _ping[1][0] > 0 else 0,
+	155 if _ping[1][1] > 0 else 0,
+	155 if _ping[1][2] > 0 else 0))
+SIGNAL_ECHO_COLOR = ('dark' + _echo[0], (
+	155 if _echo[1][0] > 0 else 0,
+	155 if _echo[1][1] > 0 else 0,
+	155 if _echo[1][2] > 0 else 0))
 SIGNAL_MESSAGE_COLOR = _message
 DOT_PING_COLOR = _ping
 DOT_ECHO_COLOR = _echo
 DOT_MESSAGE_COLOR = _message
-CONNECTION_COLOR = 'white'
-SELECTED_DEVICE_COLOR = 'gray8' #(20, 20, 20)
+CONNECTION_COLOR = ('white', (255, 255, 255))
+SELECTED_DEVICE_COLOR = ('gray8', (20, 20, 20))
 
 
 SIGNAL_RING_THICKNESS = 3

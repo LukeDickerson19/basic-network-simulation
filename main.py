@@ -56,68 +56,34 @@ import numpy as np
 
         NOW:
 
-            signal stuff
+            display stuff
 
-                draw signals better
+                give the device the color, not the node
+                and give the device a main_loop, that calls the nodes main loop
 
-                    something is wrong with the way the colors of the signals are displayed.
-                        pings's appear green when they should be red
+                make nodes fade from signal_color to NODE_DEFAULT_COLOR after signal is sent
+                    possibly at same rate signal fades
 
+                make each node have a number in its circle in the display (just its index in the list of all nodes)
 
+                make it so when you click on a node
 
-                    make signal ring's opaqueness increase as r approaches R
-                        apparently this is much harder than it seems because
-                        the draw.circle fn. in pygame doesn't take an alpha value
-                            so we need to make the color of the ring fade to the
-                            background color instead of decreasing the alpha value
-                                but theres 2 possible background colors,
-                                    BACKGROUND_COLOR black (0, 0, 0)
-                                    SELECTED_DEVICE_COLOR gray8 (20, 20, 20)
-
-                                    so instead of creating a circle we would need
-                                    to create 2 arcs. 1 arc fades to
-                                        BACKGROUND_COLOR and the other fades to
-                                        SELECTED_DEVICE_COLOR
-
-                                        to find the 2 angles where the arcs are separated
-                                        we need to find the intercept of 2 overlapping circles
-                                            (w/ known coordinates and radii)
-
-                    make node turn red, green, white right before it sends a message
-                        give them a time delay
-                            perhaps fade from signal_color to NODE_DEFAULT_COLOR after signal is sent
-
-                    make each node have a number in its circle in the display (just its index in the list of all nodes)
-
-                    make it so you can click on a node
-
-                        when you click on a node, information appears about
+                    information appears about
                         its public key
                         its messages list
 
-                        make it so you can change R (and maybe other constants) mid simulation
+                    make it so you can change R (and maybe other constants) mid simulation
 
-                    make it so you can send a message manually from one node to another
-
-                self.model.selected_device
-                    view pings, incoming echoes, outgoing/incoming messages
-
-                how much faster are the signals simulated paused/unpaused?
-
-                keep ping the way it was originally made,
-                but increase the speed, and decrease the period
-                because in reality, if they ping/pong back and forth it will take up unnessessary amounts of band width
-                    so doing it on a period is better
+            keep ping the way it was originally made,
+            but increase the speed, and decrease the period
+            because in reality, if they ping/pong back and forth it will take up unnessessary amounts of band width
+                so doing it on a period is better
 
             controls stuff
 
-                manually send message to another node
+                make it so you can send a message manually from one node to another
 
         EVENTUALLY:
-
-            is gfxdraw faster?
-                they used it here:
-                    https://stackoverflow.com/questions/27108810/pygame-draw-arc-completion-bug-or-just-me
 
             maybe pygame clock is better than time.time()
                 clock = pygame.time.Clock()
@@ -393,7 +359,7 @@ class View(object):
     def draw(self):
 
         # fill background
-        self.surface.fill(pygame.Color(BACKGROUND_COLOR))
+        self.surface.fill(pygame.Color(BACKGROUND_COLOR[0]))
 
 
         self.draw_selected_device_range()
@@ -450,7 +416,7 @@ class View(object):
             x2, y2 = int(SCREEN_SCALE*d2.n.x), int(SCREEN_SCALE*d2.n.y)
             pygame.draw.line(
                 self.surface,
-                pygame.Color(CONNECTION_COLOR),
+                pygame.Color(CONNECTION_COLOR[0]),
                 (x1, y1), (x2, y2), 1)
 
     def draw_paths_to_dst(self):
@@ -490,9 +456,9 @@ class View(object):
                 )
             ): continue
 
-            color = DOT_MESSAGE_COLOR
-            if signal['message'].m.startswith('PING'): color = DOT_PING_COLOR
-            if signal['message'].m.startswith('ECHO'): color = DOT_ECHO_COLOR
+            color = DOT_MESSAGE_COLOR[0]
+            if signal['message'].m.startswith('PING'): color = DOT_PING_COLOR[0]
+            if signal['message'].m.startswith('ECHO'): color = DOT_ECHO_COLOR[0]
             self.draw_message_dot(signal, color, sd)
     def draw_message_dot(self, signal, color, sd):
         sn, sp = signal['sender_device'].n, signal['send_pt']
@@ -615,16 +581,29 @@ class View(object):
                     else:
                         continue
 
-            color = SIGNAL_MESSAGE_COLOR
-            if signal['message'].m.startswith('PING'): color = SIGNAL_PING_COLOR
-            if signal['message'].m.startswith('ECHO'): color = SIGNAL_ECHO_COLOR
+            color = SIGNAL_MESSAGE_COLOR[1]
+            if signal['message'].m.startswith('PING'): color = SIGNAL_PING_COLOR[1]
+            if signal['message'].m.startswith('ECHO'): color = SIGNAL_ECHO_COLOR[1]
             self.draw_signal_ring(signal, color, sd, fade=True)
     def draw_signal_ring(self, signal, color, sd, fade=False):
         if fade:
-            r = signal['dist_traveled']
-            if int(SCREEN_SCALE * r) > SIGNAL_RING_THICKNESS:
-                x = signal['send_pt'][0]
-                y = signal['send_pt'][1]
+
+            def faded_color(col1, col2, f=1.0):
+                # col1 = (r1, g1, b1)
+                # col2 = (r2, g2, b2)
+                # f = fade = float between 0 and 1
+                # return the interpolation of col1 and col2 at point f
+                return (
+                    int(col1[0] + (col2[0] - col1[0])*f),
+                    int(col1[1] + (col2[1] - col1[1])*f),
+                    int(col1[2] + (col2[2] - col1[2])*f))
+
+            r = signal['dist_traveled'] # r = model radius
+            _r = int(SCREEN_SCALE * r) # _r = display radius
+            f = 1.0 - (float(R - r) / R)**4
+            if _r > SIGNAL_RING_THICKNESS:
+                x, y = signal['send_pt']
+                _x, _y = int(SCREEN_SCALE * x), int(SCREEN_SCALE * y)
                 dx, dy = x - sd.n.x, y - sd.n.y
                 dist_sd_to_send_pt = math.sqrt(dx**2 + dy**2)
                 if dist_sd_to_send_pt + r <= R:
@@ -632,16 +611,13 @@ class View(object):
                     # dist_sd_sent_pt is always <=R,
                     # b/c we're never going to draw the signal ring for a device outside of sd's range
 
-                    r = int(SCREEN_SCALE * r)
-                    x = int(SCREEN_SCALE * x)
-                    y = int(SCREEN_SCALE * y)
-
-                    color = pygame.Color('red')#color)
-
                     pygame.draw.circle(
                         self.surface,
-                        color,
-                        (x, y), r,
+                        faded_color(
+                            color,
+                            SELECTED_DEVICE_COLOR[1],
+                            f=f),
+                        (_x, _y), _r,
                         SIGNAL_RING_THICKNESS)
 
                 else: # there is an intersect
@@ -650,20 +626,23 @@ class View(object):
                     theta2 = np.pi - np.arccos((r**2 + dist_sd_to_send_pt**2 - R**2) / (2*r*dist_sd_to_send_pt))
                     a1 = theta1 + theta2
                     a2 = theta1 - theta2
-                    r = int(SCREEN_SCALE * r)
-                    x = int(SCREEN_SCALE * x)
-                    y = int(SCREEN_SCALE * y)
-                    rect = [x - r, y - r, 2*r, 2*r]
+                    rect = [_x - _r, _y - _r, 2*_r, 2*_r]
                    
                     pygame.draw.arc(
                         self.surface,
-                        pygame.Color('red'),
+                        faded_color(
+                            color,
+                            SELECTED_DEVICE_COLOR[1],
+                            f=f),
                         rect,
                         a1, a2,
                         SIGNAL_RING_THICKNESS)
                     pygame.draw.arc(
                         self.surface,
-                        pygame.Color('blue'),
+                        faded_color(
+                            color,
+                            BACKGROUND_COLOR[1],
+                            f=f),
                         rect,
                         a2, a1,
                         SIGNAL_RING_THICKNESS)
@@ -682,7 +661,7 @@ class View(object):
 
     def draw_text(self, text, x, y, size, \
         text_color=(100, 100, 100), \
-        background_color=BACKGROUND_COLOR):
+        background_color=BACKGROUND_COLOR[0]):
 
         # make text
         basicfont = pygame.font.SysFont(None, size)

@@ -13,7 +13,7 @@ class Node(object):
 		self.y = y
 
 		# color of node in display
-		self.color = NODE_DEFAULT_COLOR
+		self.color = NODE_DEFAULT_COLOR[0]
 
 		self.sk = self.create_random_string() # sk = secret key
 		self.pk = '' # pk = public key
@@ -63,7 +63,7 @@ class Node(object):
 	def main_loop(self, verbose=False):
 		t = time.time() # unix time, example: 1424233311.771502
 		# if verbose: print('\nNode %s:' % self.sk)
-		self.color = NODE_DEFAULT_COLOR # reset color
+		self.color = NODE_DEFAULT_COLOR[0] # reset color
 
 		# ping on PING_FREQUENCY
 		ping = None
@@ -71,7 +71,7 @@ class Node(object):
 			ping = self.ping(verbose=verbose)
 			self.pings = self.update_ping_list(ping, t)
 			self.prev_ping_t = t
-			self.color = NODE_PING_COLOR
+			self.color = NODE_PING_COLOR[0]
 
 			if verbose: print('hi %s' % time.ctime(t))
 			if verbose: print('%d messages' % len(self.mailbox))
@@ -155,8 +155,8 @@ class Node(object):
 					print('THEIR')
 					print(message.m)
 				messages_to_send.append(self.echo(message, verbose=verbose))
-				if self.color == NODE_DEFAULT_COLOR:
-					self.color = NODE_ECHO_COLOR
+				if self.color == NODE_DEFAULT_COLOR[0]:
+					self.color = NODE_ECHO_COLOR[0]
 
 			elif message.m.startswith('ECHO'):
 				pass
