@@ -44,7 +44,7 @@ SIGNAL_SPEED = 2.5#6.5 # how far the signal travels per second (make sure this i
 PING_FREQUENCY = 0.20#0.33 # number of pings per second
 
 # Python Color Constants Module
-# https://www.webucator.com/blog/2015/03/python-color-constants-module/
+# https://python-forum.io/Thread-PyGame-PyGame-Colors
 _ping = ('red', (255, 0, 0))
 _echo = ('green', (0, 255, 0))
 _message = ('blue', (0, 0, 255))
@@ -65,7 +65,7 @@ SIGNAL_MESSAGE_COLOR = _message
 DOT_PING_COLOR = _ping
 DOT_ECHO_COLOR = _echo
 DOT_MESSAGE_COLOR = _message
-CONNECTION_COLOR = ('white', (255, 255, 255))
+CONNECTION_COLOR = ('grey29', (74, 74, 74))
 SELECTED_DEVICE_COLOR = ('gray8', (20, 20, 20))
 def faded_color(col1, col2, f=1.0):
     # col1 = (r1, g1, b1)
