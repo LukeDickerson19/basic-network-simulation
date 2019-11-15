@@ -56,20 +56,21 @@ import numpy as np
 
             display stuff
 
-                make each node have a number in its circle in the display (just its index in the list of all nodes)
-
                 make it so when you click on a node
 
                     information appears about
                         its public key
-                        its messages list
+                        its neighbors' public keys and their estimated distance
 
-                    make it so you can change R (and maybe other constants) mid simulation
+                        ... in the terminal
 
-            keep ping the way it was originally made,
-            but increase the speed, and decrease the period
-            because in reality, if they ping/pong back and forth it will take up unnessessary amounts of band width
-                so doing it on a period is better
+                        ... and set verbose=False to everything else
+
+                keep ping the way it was originally made,
+                increase signal speed a lot
+                increase ping period a little bit
+                decrease device speed a lot
+                increase R a little bit
 
             put echo parse and ping parse in fns in node class (or separate file) and call them
                 this is just to have them in one easily modifiable place
@@ -77,6 +78,8 @@ import numpy as np
             controls stuff
 
                 make it so you can send a message manually from one node to another
+
+                verify message display is working properly
 
         EVENTUALLY:
 
