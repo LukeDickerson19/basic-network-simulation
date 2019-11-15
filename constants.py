@@ -1,5 +1,6 @@
 import math
 import string
+import pygame
 
 
 
@@ -48,10 +49,10 @@ _ping = ('red', (255, 0, 0))
 _echo = ('green', (0, 255, 0))
 _message = ('blue', (0, 0, 255))
 BACKGROUND_COLOR = ('black', (0, 0, 0))
-NODE_DEFAULT_COLOR = ('white', (255, 255, 255))
-NODE_PING_COLOR = _ping
-NODE_ECHO_COLOR = _echo
-NODE_MESSAGE_COLOR = _message
+DEVICE_DEFAULT_COLOR = ('white', (255, 255, 255))
+DEVICE_PING_COLOR = _ping
+DEVICE_ECHO_COLOR = _echo
+DEVICE_MESSAGE_COLOR = _message
 SIGNAL_PING_COLOR = ('dark' + _ping[0], (
 	155 if _ping[1][0] > 0 else 0,
 	155 if _ping[1][1] > 0 else 0,
@@ -66,9 +67,20 @@ DOT_ECHO_COLOR = _echo
 DOT_MESSAGE_COLOR = _message
 CONNECTION_COLOR = ('white', (255, 255, 255))
 SELECTED_DEVICE_COLOR = ('gray8', (20, 20, 20))
+def faded_color(col1, col2, f=1.0):
+    # col1 = (r1, g1, b1)
+    # col2 = (r2, g2, b2)
+    # f = fade = float between 0 and 1
+    # return the interpolation of col1 and col2 at point f
+    return (
+        int(col1[0] + (col2[0] - col1[0])*f),
+        int(col1[1] + (col2[1] - col1[1])*f),
+        int(col1[2] + (col2[2] - col1[2])*f))
 
 
+DEVICE_SIZE = 5
 SIGNAL_RING_THICKNESS = 3
+DOT_SIZE = 3
 
 ALL_CHARS = ''.join(set(string.printable) - set(string.whitespace)) # all printable characters except white space, used for key creation
 # source: https://docs.python.org/3/library/string.html

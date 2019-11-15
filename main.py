@@ -1,7 +1,5 @@
 import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
-import pygame
-from pygame import gfxdraw
 import time
 import copy
 import sys
@@ -58,12 +56,6 @@ import numpy as np
 
             display stuff
 
-                give the device the color, not the node
-                and give the device a main_loop, that calls the nodes main loop
-
-                make nodes fade from signal_color to NODE_DEFAULT_COLOR after signal is sent
-                    possibly at same rate signal fades
-
                 make each node have a number in its circle in the display (just its index in the list of all nodes)
 
                 make it so when you click on a node
@@ -78,6 +70,9 @@ import numpy as np
             but increase the speed, and decrease the period
             because in reality, if they ping/pong back and forth it will take up unnessessary amounts of band width
                 so doing it on a period is better
+
+            put echo parse and ping parse in fns in node class (or separate file) and call them
+                this is just to have them in one easily modifiable place
 
             controls stuff
 
@@ -98,6 +93,9 @@ import numpy as np
 
             model could be faster if we did more stuff in parallel using async lib
                 https://realpython.com/async-io-python/
+
+                Efficient Parallel Graph Algorithms in Python
+                https://pdfs.semanticscholar.org/54b9/22a51e5aa04e7512720348c2deda33e2e4ee.pdf
 
             make static map and cellular automata maps
                 figure out how to get a fully connected network that is distributed evenly
@@ -345,13 +343,14 @@ class View(object):
 
         self.show_controls = False # toggle control display
 
-        self.c = True # draw connections
-        self.d = True # draw message dots
-        self.r = True # draw signal rings
-        self.p0 = False # draw pings of selected device
+        self.c  = True  # draw connections
+        self.d  = True  # draw message dots
+        self.r  = True  # draw signal rings
+        self.n  = True  # draw node color change from signal
+        self.p0 = True  # draw pings of selected device
         self.p1 = False # draw pings of direct neighbors of selected device
         self.e0 = False # draw echos of selected device
-        self.e1 = False # draw echos of direct neighbors of selected device
+        self.e1 = True  # draw echos of direct neighbors of selected device
         self.m0 = False # draw messages of selected device
         self.m1 = False # draw messages of direct neighbors of selected device
 
@@ -392,21 +391,115 @@ class View(object):
             x = int(SCREEN_SCALE * sd.n.x)
             y = int(SCREEN_SCALE * sd.n.y)
             r = int(SCREEN_SCALE * R)
-            col = 20 # 0=black, 255=white, we want dark dark gray
+            color = pygame.Color(SELECTED_DEVICE_COLOR[0])
             pygame.draw.circle(
                 self.surface,
-                (col, col, col),
+                color,
                 (x, y), r)
 
     def draw_devices(self):
+        sd = self.model.selected_device
         for d in model.devices:
             if not isinstance(d, Device): continue
             x = int(SCREEN_SCALE*d.n.x)
             y = int(SCREEN_SCALE*d.n.y)
+            color =  self.get_device_color(sd, d, d.sent_messages, self.model.dt)
             pygame.draw.circle(
                 self.surface,
-                pygame.Color(d.n.color),
-                (x, y), 5) # (x,y), radius
+                color,
+                (x, y), DEVICE_SIZE) # (x,y), radius
+    def get_device_color(self, sd, d, sent_messages, dt):
+
+        if  (not self.n) or \
+            (sd == None) or \
+            (sd != d and (not (d in self.model.connections[sd]))):
+            return pygame.Color(DEVICE_DEFAULT_COLOR[0])
+
+        if d == sd: # selected device
+            _p, _e, _m = self.p0, self.e0, self.m0
+        else: # neighbor
+            _p, _e, _m = self.p1, self.e1, self.m1
+        p, e, m = False, False, False
+        for m in sent_messages:
+            if _m:
+                m = True
+                d.message_dist = 0
+                d.most_recent_message_type = 'message'
+            elif _p and m.m.startswith('PING'):
+                p = True
+                d.ping_dist = 0
+                if ((not _m) or (d.message_dist != 0)):
+                    d.most_recent_message_type = 'ping'
+            elif _e and m.m.startswith('ECHO'):
+
+                # if self.e1: only do echo's meant for the sd (if e1 )
+                # if self.e0: draw all its (the sd's) echos
+                if self.e1:
+                    rs = m.m.split('\n')[3] # rs = random string
+                    if rs not in sd.n.pings.keys():
+                        continue
+
+                e = True
+                d.echo_dist = 0
+                if ((not _m) or (d.message_dist != 0)) and ((not _p) or (d.ping_dist != 0)):
+                    d.most_recent_message_type = 'echo'
+
+        if p:
+            ping_color = DEVICE_PING_COLOR[1]
+        else:
+            if d.ping_dist != None:
+                d.ping_dist += SIGNAL_SPEED * dt
+                if d.ping_dist > R:
+                    d.ping_dist = None
+                    ping_color = DEVICE_DEFAULT_COLOR[1]
+                else:
+                    ping_color = faded_color(
+                        DEVICE_PING_COLOR[1],
+                        DEVICE_DEFAULT_COLOR[1],
+                        f=1.0 - (float(R - d.ping_dist) / R)**2)
+            else:
+                ping_color = DEVICE_DEFAULT_COLOR[1]
+
+        if e:
+            echo_color = DEVICE_ECHO_COLOR[1]
+        else:
+            if d.echo_dist != None:
+                d.echo_dist += SIGNAL_SPEED * dt
+                if d.echo_dist > R:
+                    d.echo_dist = None
+                    echo_color = DEVICE_DEFAULT_COLOR[1]
+                else:
+                    echo_color = faded_color(
+                        DEVICE_ECHO_COLOR[1],
+                        DEVICE_DEFAULT_COLOR[1],
+                        f=1.0 - (float(R - d.echo_dist) / R)**2)
+            else:
+                echo_color = DEVICE_DEFAULT_COLOR[1]
+
+        if m:
+            message_color = DEVICE_MESSAGE_COLOR[1]
+        else:
+            if d.message_dist != None:
+                d.message_dist += SIGNAL_SPEED * dt
+                if d.message_dist > R:
+                    d.message_dist = None
+                    message_color = DEVICE_DEFAULT_COLOR[1]
+                else:
+                    message_color = faded_color(
+                        DEVICE_MESSAGE_COLOR[1],
+                        DEVICE_DEFAULT_COLOR[1],
+                        f=1.0 - (float(R - d.message_dist) / R)**2)
+            else:
+                message_color = DEVICE_DEFAULT_COLOR[1]
+
+        # if d == d0:
+        #     print(d.most_recent_message_type)
+
+        if _m and d.most_recent_message_type == 'message': return message_color
+        if _p and d.most_recent_message_type == 'ping':    return ping_color
+        if _e and d.most_recent_message_type == 'echo':    return echo_color
+        return pygame.Color(DEVICE_DEFAULT_COLOR[0])
+
 
     def draw_in_range_connections(self):
         for edge in model.edges:
@@ -438,27 +531,27 @@ class View(object):
 
             # filter which dots to draw
             # if signal['sender_device'] != sd: continue
-            # if not signal['message'].m.startswith('ECHO'): continue
+            # if not signal['message_type'] == 'echo': continue
             d0 = signal['sender_device']
             if not (
                 (
                     d0 == sd and (
                         (self.m0) or
-                        (self.p0 and signal['message'].m.startswith('PING')) or
-                        (self.e0 and signal['message'].m.startswith('ECHO'))
+                        (self.p0 and signal['message_type'] == 'ping') or
+                        (self.e0 and signal['message_type'] == 'echo')
                     )
                 ) or (
                     d0 in self.model.connections[sd] and (
                         (self.m1) or
-                        (self.p1 and signal['message'].m.startswith('PING')) or
-                        (self.e1 and signal['message'].m.startswith('ECHO'))
+                        (self.p1 and signal['message_type'] == 'ping') or
+                        (self.e1 and signal['message_type'] == 'echo')
                     )
                 )
             ): continue
 
             color = DOT_MESSAGE_COLOR[0]
-            if signal['message'].m.startswith('PING'): color = DOT_PING_COLOR[0]
-            if signal['message'].m.startswith('ECHO'): color = DOT_ECHO_COLOR[0]
+            if signal['message_type'] == 'ping': color = DOT_PING_COLOR[0]
+            if signal['message_type'] == 'echo': color = DOT_ECHO_COLOR[0]
             self.draw_message_dot(signal, color, sd)
     def draw_message_dot(self, signal, color, sd):
         sn, sp = signal['sender_device'].n, signal['send_pt']
@@ -468,13 +561,13 @@ class View(object):
 
             # filter which dots to draw
             if sd not in edge: continue # only draw signals going to/from sd
-            if signal['message'].m.startswith('ECHO'): # only draw echo dot to intended receiver_node
+            if signal['message_type'] == 'echo': # only draw echo dot to intended receiver_node
                 nd = edge[0] if edge[1] == sd else edge[1] # nd = neighboring device (of selected device)
                 rd = nd if sn == sd.n else sd # rd = receiver device
                 rn_id = signal['message'].m.split('\n')[1].split(' ')[2] # receiver node according to echo message
                 if rd.n.sk != rn_id: continue
                 if {rd, signal['sender_device']} != _edge: continue # only draw on the edge with both sender and receiver device
-            if signal['message'].m.startswith('PING'):
+            if signal['message_type'] == 'ping':
                 if signal['sender_device'] != sd: # if a neighboring device is sending the ping
                     # only draw it on the edge between that neighboring device and sd
                     if {signal['sender_device'], sd} != _edge: continue
@@ -546,7 +639,7 @@ class View(object):
                 pygame.draw.circle(
                     self.surface,
                     pygame.Color(color),
-                    (x, y), 3) # (x,y), radius
+                    (x, y), DOT_SIZE) # (x,y), radius
 
     def draw_signals(self):
         sd = self.model.selected_device
@@ -558,19 +651,19 @@ class View(object):
                 (
                     d0 == sd and (
                         (self.m0) or
-                        (self.p0 and signal['message'].m.startswith('PING')) or
-                        (self.e0 and signal['message'].m.startswith('ECHO'))
+                        (self.p0 and signal['message_type'] == 'ping') or
+                        (self.e0 and signal['message_type'] == 'echo')
                     )
                 ) or (
                     d0 in self.model.connections[sd] and (
                         (self.m1) or
-                        (self.p1 and signal['message'].m.startswith('PING')) or
-                        (self.e1 and signal['message'].m.startswith('ECHO'))
+                        (self.p1 and signal['message_type'] == 'ping') or
+                        (self.e1 and signal['message_type'] == 'echo')
                     )
                 )
             ): continue
 
-            if signal['message'].m.startswith('ECHO'): # only draw echo dot to intended receiver_node
+            if signal['message_type'] == 'echo': # only draw echo dot to intended receiver_node
                 rn_id = signal['message'].m.split('\n')[1].split(' ')[2] # rn_id = receiver node id
                 if d0 == sd:
                     pass # draw signal for all echos
@@ -582,10 +675,10 @@ class View(object):
                         continue
 
             color = SIGNAL_MESSAGE_COLOR[1]
-            if signal['message'].m.startswith('PING'): color = SIGNAL_PING_COLOR[1]
-            if signal['message'].m.startswith('ECHO'): color = SIGNAL_ECHO_COLOR[1]
+            if signal['message_type'] == 'ping': color = SIGNAL_PING_COLOR[1]
+            if signal['message_type'] == 'echo': color = SIGNAL_ECHO_COLOR[1]
             self.draw_signal_ring(signal, color, sd, fade=True)
-    def draw_signal_ring(self, signal, color, sd, fade=False):
+    def draw_signal_ring(self, signal, color, sd, fade=True):
         if fade:
 
             def faded_color(col1, col2, f=1.0):
@@ -695,31 +788,29 @@ class Model(object):
         t = time.time()
         self.t1 = t # t1 = time of previous time step (1 time step in the past)
 
-        # window parameters / drawing
-        self.show = True # show current model
-
         # controller variables
         self.selected_device = None # device user clicked on
-        self.pause_devices  = False # pause/play movement
-        self.pause_nodes    = False # pause/play signals
-
+        self.pause_devices   = False # pause/play movement
+        self.pause_signals   = False # pause/play signals
 
     # main_loop of the model
     def update(self, verbose=False):
 
         t = time.time()
+        self.dt = t - self.t1
         # if verbose: print('%s\nt = %s' % ('-'*180, t))
 
         # move message signals forward,
         # deliver message if it's reached a node,
-        # remove it when its travelled R
-        if not self.pause_nodes:
+        # remove it when its travelled R,
+        # and run each devices'/nodes' main_loop
+        if not self.pause_signals:
             signals_outside_range = []
             for signal in self.signals:
 
                 # move message forward
                 prev_signal_dist = signal['dist_traveled']
-                signal['dist_traveled'] += (SIGNAL_SPEED * (t - self.t1))
+                signal['dist_traveled'] += (SIGNAL_SPEED * self.dt)
                 if signal['dist_traveled'] > R: signal['dist_traveled'] = R
 
                 # deliver message if it's reached a node
@@ -749,17 +840,24 @@ class Model(object):
                 # every node sends out a ping signal on a timed interval
                 # and responds to any messages it has received immediately
                 # n.print_n(i=i+1, num_nodes=len(devices), newline_start=True)
-                sent_messages = d.n.main_loop(verbose=False)#d==self.selected_device)
+                sent_messages = d.main_loop(verbose=False)#d==self.selected_device)
                 for message in sent_messages:
+
+                    if message.m.startswith('PING'):   message_type = 'ping'
+                    elif message.m.startswith('ECHO'): message_type = 'echo'
+                    else:                              message_type = 'message'
+
                     self.signals.append({
                         'sender_device'    : d,
                         'dist_traveled'    : 0.00,
                         'send_pt'          : (d.n.x, d.n.y),
-                        'message'          : message, # this
+                        'message'          : message,
+                        'message_type'     : message_type,
                         'receiver_devices' : set() # ensures that a signal doesn't pass a node twice
                     })
 
-        ''' move the devices, and update devices, connections and edges
+        ''' move the devices,
+            update devices, connections, and edges
 
             there are a variable number of nodes on the map at any given time
                 ranging from N_MIN to N_MAX
@@ -824,8 +922,8 @@ class Model(object):
             self.devices = devices
             self.connections, self.edges = self.set_connections(self.devices)
 
-
-        self.t1 = t # update t1 at end of update()
+        # update t1 at end of update()
+        self.t1 = t
 
     # create devices that move around the map
     def init_moving_devices(self, verbose=False):
@@ -928,42 +1026,53 @@ class Controller(object):
             if verbose: print('space bar')
             self.model.pause_devices = not self.model.pause_devices
 
-        elif event.key == pygame.K_n:
-            if verbose: print('n')
-            self.model.pause_nodes = not self.model.pause_nodes
+        elif event.key == pygame.K_s:
+            self.model.pause_signals = not self.model.pause_signals
+            if verbose: print('model.pause_signals = %s' % model.pause_signals)
 
         elif event.key == pygame.K_d:
-            if verbose: print('d')
             self.view.d = not self.view.d # toggle draw message dots
+            if verbose: print('d = %s' % self.view.d)
 
         elif event.key == pygame.K_r:
-            if verbose: print('r')
             self.view.r = not self.view.r # toggle draw signal rings
+            if verbose: print('r = %s' % self.view.r)
 
         elif event.key == pygame.K_c:
-            if verbose: print('c')
             self.view.c = not self.view.c # toggle draw connection lines
+            if verbose: print('c = %s' % self.view.c)
+
+        elif event.key == pygame.K_n:
+            self.view.n = not self.view.n # toggle draw node color change from signal
+            if verbose: print('n = %s' % self.view.n)
 
         elif event.key == pygame.K_RETURN:
             print('self.buffer = %s' % self.buffer)
-            if self.buffer == 'p0':
+
+            if   self.buffer == 'p0':
                 self.view.p0 = not self.view.p0
                 if verbose: print('p0 = %s' % self.view.p0)
+
             elif self.buffer == 'p1':
                 self.view.p1 = not self.view.p1
                 if verbose: print('p1 = %s' % self.view.p1)
+
             elif self.buffer == 'e0':
                 self.view.e0 = not self.view.e0
-                if verbose: print('e0 = %s' % self.view.p1)
+                if verbose: print('e0 = %s' % self.view.e0)
+
             elif self.buffer == 'e1':
                 self.view.e1 = not self.view.e1
                 if verbose: print('e1 = %s' % self.view.e1)
+
             elif self.buffer == 'm0':
                 self.view.m0 = not self.view.m0
                 if verbose: print('m0 = %s' % self.view.m0)
+
             elif self.buffer == 'm1':
                 self.view.m1 = not self.view.m1
-                if verbose: print('m1 = %s' % self.view.m0)
+                if verbose: print('m1 = %s' % self.view.m1)
+
             else:
                 if verbose: print('unknown buffer: %s' % self.buffer)
             self.buffer = ''
