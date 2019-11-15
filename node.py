@@ -57,6 +57,7 @@ class Node(object):
 		self.pings = {}
 		self.prev_ping_t = time.time() - (1 / PING_FREQUENCY)*random.uniform(0, 1) # start pings at random times in period
 
+
 	def main_loop(self, verbose=False):
 		t = time.time() # unix time, example: 1424233311.771502
 		# if verbose: print('\nNode %s:' % self.sk)

@@ -8,6 +8,7 @@ class Message(object):
         self.m = m
         self.rpk = receiver_public_key
 
+
     def set_time_sent(self, t):
         # t = time sent (int)
         self.time_sent = t

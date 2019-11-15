@@ -50,6 +50,10 @@ import numpy as np
         what if you used the position triangluation to verify that someone isn't using a server farm to run a bunch of nodes
         in order for nodes to count they need to be spread out (and moving frequenty? what about desktops) to exibit normal device behavior
 
+        can current router hardware communicate directly with each other, if they're in range?
+            probably not, we need something that extends MILES, not the area of a house
+
+
     TO DO:
 
         NOW:
@@ -63,21 +67,34 @@ import numpy as np
                         its neighbors' public keys and their estimated distance
 
                         ... in the terminal
+                            look into how to write over old text in the the terminal
+                            so terminal output is constant
+                                maybe display network metrics
+                                maybe display key commands (toggleable)
 
                         ... and set verbose=False to everything else
 
-                keep ping the way it was originally made,
                 increase signal speed a lot
                 increase ping period a little bit
                 decrease device speed a lot
                 increase R a little bit
+                    determine average walking speed of person in km/s
+                    determine speed of light in km/s
+                        if signal blasted past R in one time step would that fuck up anything
+                    determine signal range of average cellphone in km
 
             put echo parse and ping parse in fns in node class (or separate file) and call them
                 this is just to have them in one easily modifiable place
 
+            would it be possible to transfer x and y to Device instead of Node?
+                check all uses of x and y in main and in Node and in Device and in constants
+
             controls stuff
 
                 make it so you can send a message manually from one node to another
+                and you can select from a list of all possible messages a node can make in the terminal
+
+                    might need to create child class for node 1st to display all possible messages
 
                 verify message display is working properly
 
