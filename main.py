@@ -1,17 +1,3 @@
-import os
-os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
-import time
-import copy
-import sys
-import math
-import random
-from pygame.locals import QUIT, KEYDOWN
-from constants import *
-from node import Node
-from device import Device
-from message import Message
-import numpy as np
-
 
 
 ''' NOTES:
@@ -53,15 +39,16 @@ import numpy as np
         can current router hardware communicate directly with each other, if they're in range?
             probably not, we need something that extends MILES, not the area of a house
 
-
     TO DO:
 
         NOW:
 
             display stuff
 
-                make it so when you click on a node
+                is it possible to give the device the x,y coordiantes?
+                    possibly, but we might want to use longitude, latitude on the node process so its better they keep x and y
 
+                make it so when you click on a node
                     information appears about
                         its public key
                         its neighbors' public keys and their estimated distance
@@ -339,7 +326,7 @@ import numpy as np
 
                         # update the Nodes in the network every AUTOMATA_PERIOD
                         if (t - self.t2) > AUTOMATA_PERIOD:
-                            self.evolve_grid(verbose=True)
+                            self.evolve_grid(verbose=False)
                             self.t2 = t
 
                 ####################################################################################
@@ -350,6 +337,25 @@ import numpy as np
             where each boid has its own destination
 
         '''
+
+import os
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
+os.environ['SDL_VIDEO_WINDOW_POS'] = "800,100" # set GUI window start position
+import time
+import copy
+import sys
+import math
+import random
+import pandas as pd
+pd.option_context('display.colheader_justify','right')
+from pygame.locals import QUIT, KEYDOWN
+from constants import *
+from node import Node
+from device import Device
+from message import Message
+import numpy as np
+from block_printer import BlockPrinter
+
 
 
 
@@ -363,17 +369,26 @@ class View(object):
 
         self.show_controls = False # toggle control display
 
-        self.c  = True  # draw connections
-        self.d  = True  # draw message dots
-        self.r  = True  # draw signal rings
-        self.n  = True  # draw node color change from signal
-        self.p0 = True  # draw pings of selected device
-        self.p1 = False # draw pings of direct neighbors of selected device
-        self.e0 = False # draw echos of selected device
-        self.e1 = True  # draw echos of direct neighbors of selected device
-        self.m0 = False # draw messages of selected device
-        self.m1 = False # draw messages of direct neighbors of selected device
+        init_settings = [
+            ('c',  'connections',  True),
+            ('d',  'message dots', True),
+            ('r',  'signal rings', True),
+            ('f',  'node signal flash', True),
+            ('p0', 'pings of selected device', True),
+            ('e0', 'echos of selected device', False),
+            ('m0', 'messages of selected device', False),
+            ('p1', 'pings of direct neighbors of selected device', False),
+            ('e1', 'echos of direct neighbors of selected device', True),
+            ('m1', 'messages of direct neighbors of selected device', False)
+        ]
+        self.settings = pd.DataFrame({
+            'key'   : list(map(lambda x : x[0], init_settings)),
+            'draw'  : list(map(lambda x : x[1], init_settings)),
+            'state' : list(map(lambda x : x[2], init_settings))
+        }).set_index('key')
+        self.updated_settings = True
 
+        self.bp = BlockPrinter()
 
     def draw(self):
 
@@ -382,12 +397,12 @@ class View(object):
 
 
         self.draw_selected_device_range()
-        if self.model.selected_device != None:
-            if self.r: self.draw_signals()
-        if self.c:
+        if self.model.selected_device != None and self.settings.at['r', 'state']:
+            self.draw_signals()
+        if self.settings.at['c', 'state']: 
             self.draw_in_range_connections()
-        if self.model.selected_device != None:
-            if self.d: self.draw_messages()
+        if self.model.selected_device != None and self.settings.at['d', 'state']:
+            self.draw_messages()
         # self.draw_paths_to_dst()
         self.draw_devices()
 
@@ -404,6 +419,10 @@ class View(object):
 
         # update display
         pygame.display.update()
+
+        # update console output
+        if self.updated_settings:
+            self.bp.print(self.create_console_output())
 
     def draw_selected_device_range(self):
         sd = self.model.selected_device
@@ -430,15 +449,15 @@ class View(object):
                 (x, y), DEVICE_SIZE) # (x,y), radius
     def get_device_color(self, sd, d, sent_messages, dt):
 
-        if  (not self.n) or \
+        if  (not self.settings.at['f', 'state']) or \
             (sd == None) or \
             (sd != d and (not (d in self.model.connections[sd]))):
             return pygame.Color(DEVICE_DEFAULT_COLOR[0])
 
         if d == sd: # selected device
-            _p, _e, _m = self.p0, self.e0, self.m0
+            _p, _e, _m = self.settings.at['p0', 'state'], self.settings.at['e0', 'state'], self.settings.at['m0', 'state']
         else: # neighbor
-            _p, _e, _m = self.p1, self.e1, self.m1
+            _p, _e, _m = self.settings.at['p1', 'state'], self.settings.at['e1', 'state'], self.settings.at['m1', 'state']
         p, e, m = False, False, False
         for m in sent_messages:
             if _m:
@@ -452,9 +471,9 @@ class View(object):
                     d.most_recent_message_type = 'ping'
             elif _e and m.m.startswith('ECHO'):
 
-                # if self.e1: only do echo's meant for the sd (if e1 )
-                # if self.e0: draw all its (the sd's) echos
-                if self.e1:
+                # if self.settings.at['e1', 'state']: only do echo's meant for the sd (if e1 )
+                # if self.settings.at['e0', 'state']: draw all its (the sd's) echos
+                if self.settings.at['e1', 'state']:
                     rs = m.m.split('\n')[3] # rs = random string
                     if rs not in sd.n.pings.keys():
                         continue
@@ -520,7 +539,6 @@ class View(object):
         if _e and d.most_recent_message_type == 'echo':    return echo_color
         return pygame.Color(DEVICE_DEFAULT_COLOR[0])
 
-
     def draw_in_range_connections(self):
         for edge in model.edges:
             edge = tuple(edge)
@@ -556,15 +574,15 @@ class View(object):
             if not (
                 (
                     d0 == sd and (
-                        (self.m0) or
-                        (self.p0 and signal['message_type'] == 'ping') or
-                        (self.e0 and signal['message_type'] == 'echo')
+                        (self.settings.at['m0', 'state']) or
+                        (self.settings.at['p0', 'state'] and signal['message_type'] == 'ping') or
+                        (self.settings.at['e0', 'state'] and signal['message_type'] == 'echo')
                     )
                 ) or (
                     d0 in self.model.connections[sd] and (
-                        (self.m1) or
-                        (self.p1 and signal['message_type'] == 'ping') or
-                        (self.e1 and signal['message_type'] == 'echo')
+                        (self.settings.at['m1', 'state']) or
+                        (self.settings.at['p1', 'state'] and signal['message_type'] == 'ping') or
+                        (self.settings.at['e1', 'state'] and signal['message_type'] == 'echo')
                     )
                 )
             ): continue
@@ -670,15 +688,15 @@ class View(object):
             if not (
                 (
                     d0 == sd and (
-                        (self.m0) or
-                        (self.p0 and signal['message_type'] == 'ping') or
-                        (self.e0 and signal['message_type'] == 'echo')
+                        (self.settings.at['m0', 'state']) or
+                        (self.settings.at['p0', 'state'] and signal['message_type'] == 'ping') or
+                        (self.settings.at['e0', 'state'] and signal['message_type'] == 'echo')
                     )
                 ) or (
                     d0 in self.model.connections[sd] and (
-                        (self.m1) or
-                        (self.p1 and signal['message_type'] == 'ping') or
-                        (self.e1 and signal['message_type'] == 'echo')
+                        (self.settings.at['m1', 'state']) or
+                        (self.settings.at['p1', 'state'] and signal['message_type'] == 'ping') or
+                        (self.settings.at['e1', 'state'] and signal['message_type'] == 'echo')
                     )
                 )
             ): continue
@@ -789,6 +807,19 @@ class View(object):
         # draw text
         self.surface.blit(text_render, (x, y))
 
+    def create_console_output(self):
+
+
+        df = self.settings
+        df = df.assign(state=lambda df : df.state.replace([True, False], ['ON', 'OFF'])) # convert True/False to ON/OFF
+        # df.style.set_properties(**{'text-align': 'right'}) # right allign text
+        # dfStyler = df.style.set_properties(**{'text-align': 'right'})
+        # dfStyler.set_table_styles([dict(selector='th', props=[('text-align', 'right')])])
+        display_controls = df.to_string()
+
+        self.updated_settings = False
+        return \
+            display_controls
 
 class Model(object):
 
@@ -1035,63 +1066,35 @@ class Controller(object):
                     if verbose: print('mouse wheel scroll down')
                 elif event.button == 1:
                     if verbose: print('mouse left click')
-                    self.model.selected_device = self.select_or_deselect_device(mx, my, verbose=True)
+                    self.model.selected_device = self.select_or_deselect_device(mx, my, verbose=False)
 
                 elif event.button == 3:
                     if verbose: print('mouse right click') # 2 finger click on Mac
                 else:
                     if verbose: print('event.button = %d' % event.button)
 
-        elif event.key == pygame.K_SPACE:
+        elif event.key == pygame.K_SPACE: # toggle pause/play of movement of devices
             if verbose: print('space bar')
             self.model.pause_devices = not self.model.pause_devices
 
-        elif event.key == pygame.K_s:
+        elif event.key == pygame.K_s: # toggle pause/play of signals in actual simulation
             self.model.pause_signals = not self.model.pause_signals
             if verbose: print('model.pause_signals = %s' % model.pause_signals)
 
-        elif event.key == pygame.K_d:
-            self.view.d = not self.view.d # toggle draw message dots
-            if verbose: print('d = %s' % self.view.d)
-
-        elif event.key == pygame.K_r:
-            self.view.r = not self.view.r # toggle draw signal rings
-            if verbose: print('r = %s' % self.view.r)
-
-        elif event.key == pygame.K_c:
-            self.view.c = not self.view.c # toggle draw connection lines
-            if verbose: print('c = %s' % self.view.c)
-
-        elif event.key == pygame.K_n:
-            self.view.n = not self.view.n # toggle draw node color change from signal
-            if verbose: print('n = %s' % self.view.n)
+        elif event.key == pygame.K_d: self.update_view_settings('r') # toggle draw message dots
+        elif event.key == pygame.K_r: self.update_view_settings('r') # toggle draw signal rings
+        elif event.key == pygame.K_c: self.update_view_settings('c') # toggle draw connection lines
+        elif event.key == pygame.K_f: self.update_view_settings('f') # toggle draw node flash from signal
 
         elif event.key == pygame.K_RETURN:
-            print('self.buffer = %s' % self.buffer)
+            if verbose: print('self.buffer = %s' % self.buffer)
 
-            if   self.buffer == 'p0':
-                self.view.p0 = not self.view.p0
-                if verbose: print('p0 = %s' % self.view.p0)
-
-            elif self.buffer == 'p1':
-                self.view.p1 = not self.view.p1
-                if verbose: print('p1 = %s' % self.view.p1)
-
-            elif self.buffer == 'e0':
-                self.view.e0 = not self.view.e0
-                if verbose: print('e0 = %s' % self.view.e0)
-
-            elif self.buffer == 'e1':
-                self.view.e1 = not self.view.e1
-                if verbose: print('e1 = %s' % self.view.e1)
-
-            elif self.buffer == 'm0':
-                self.view.m0 = not self.view.m0
-                if verbose: print('m0 = %s' % self.view.m0)
-
-            elif self.buffer == 'm1':
-                self.view.m1 = not self.view.m1
-                if verbose: print('m1 = %s' % self.view.m1)
+            if   self.buffer == 'p0': self.update_view_settings('p0') # toggle drawing pings of selected device
+            elif self.buffer == 'p1': self.update_view_settings('p1') # toggle drawing pings of direct neighbors of selected device
+            elif self.buffer == 'e0': self.update_view_settings('e0') # toggle drawing echos of selected device
+            elif self.buffer == 'e1': self.update_view_settings('e1') # toggle drawing echos of direct neighbors of selected device
+            elif self.buffer == 'm0': self.update_view_settings('m0') # toggle drawing messages of selected device
+            elif self.buffer == 'm1': self.update_view_settings('m1') # toggle drawing messages of direct neighbors of selected device
 
             else:
                 if verbose: print('unknown buffer: %s' % self.buffer)
@@ -1116,6 +1119,11 @@ class Controller(object):
         # keys = pygame.key.get_pressed()  # checking pressed keys
         # if keys[pygame.K_UP]:
         #     pass # etc. ...
+    def update_view_settings(self, key, verbose=False):
+            current_state = self.view.settings.loc[key]['state']
+            self.view.settings.at[key, 'state'] = not current_state
+            self.view.updated_settings = True
+            if verbose: print('%s = %s' % (key, self.view.settings.loc[key]['state']))
 
     # click unselected device to select it,
     # click selected device again to deselect it
@@ -1148,6 +1156,8 @@ class Controller(object):
         return closest_device
 
 
+
+
 if __name__ == '__main__':
 
     # pygame setup
@@ -1176,10 +1186,10 @@ if __name__ == '__main__':
                 pygame.quit()
                 sys.exit()
             else:
-                controller.handle_event(event, verbose=True)
+                controller.handle_event(event, verbose=False)
 
         # update the model
-        model.update(verbose=True)
+        model.update(verbose=False)
 
         # display the view
         view.draw()
