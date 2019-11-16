@@ -1,36 +1,57 @@
 
 '''
 
-    https://realpython.com/intro-to-python-threading/
+    Description:
 
-    python threading lock vs semaphore
-    python threading mutex
+        Example of how to do basic threading
 
-    we don't need to lock any of the data (aka the model) for this process though
-    we just need to create
-        a thread for the Model's main_loop
-        a thread for the Controller's main_loop
-        a thread for the Views main_loop
-            the View thread can be split into:
-                a thread that updates the gui
-                a thread that updates the console output
-            each of the view's threads will have a boolean
-                if the boolean is True  the thread will be stared and it will continually run the update function of the gui/console output
-                if the boolean is False the thread will be terminated
+    Relation to this repo:
+        
+        we don't need to lock any of the data (aka the model) for this process though
+        we just need to create
+            a thread for the Model's main_loop
+            a thread for the Controller's main_loop
+            a thread for the Views main_loop
+                the View thread can be split into:
+                    a thread that updates the gui
+                    a thread that updates the console output
+                each of the view's threads will have a boolean
+                    if the boolean is True  the thread will be stared and it will continually run the update function of the gui/console output
+                    if the boolean is False the thread will be terminated
 
-        each of these thread are 3 branches of threads branching off the root thread in a thread tree
-            just start with these 3 branches and see how much faster the program runs
-                keep a version of just 1 thread to compare the new and old versions
-                    keeping different versions will allow for comparing later stages in the tree as well
+            each of these thread are 3 branches of threads branching off the root thread in a thread tree
+                just start with these 3 branches and see how much faster the program runs
+                    keep a version of just 1 thread to compare the new and old versions
+                        keeping different versions will allow for comparing later stages in the tree as well
 
-    the display variables would have to be in the model
-        could they be kept in the View somehow?
-            yes, and if the controller thread modifies the 
+        the display variables would have to be in the model
+            could they be kept in the View somehow?
+                yes, and if the controller thread modifies the 
 
 
-    format python logger lib to use milliseconds:
-    https://stackoverflow.com/questions/31328300/python-logging-module-logging-timestamp-to-include-microsecond/31335874
+    Other things to Research:
 
+        Google:
+            python threading lock vs semaphore
+            python threading mutex
+
+        python multiprocessing - completely different library that could be better than (or use in tandem with) threading
+        https://docs.python.org/3.4/library/multiprocessing.html?highlight=process
+
+
+    Source:
+
+        Where I originally got the example below
+        https://realpython.com/intro-to-python-threading/
+
+        format python logger lib to use milliseconds:
+        https://stackoverflow.com/questions/31328300/python-logging-module-logging-timestamp-to-include-microsecond/31335874
+
+        Threading Docs
+        https://docs.python.org/3/library/threading.html
+
+        Get thread id in logger
+        https://javawithravi.com/how-to-display-thread-id-in-python-logs/
 
     '''
 

@@ -32,7 +32,7 @@ MIN_VEL = AVG_VEL - 3*STD_DEV_VEL # min device velocity
 MIN_VEL = max(MIN_VEL, 0.00001) # ensure MIN_VEL is always positive
 MAX_DST_DIST = 0.01 # max distance from device to destination that qualifies as reaching the destination
 R = 5.0 # signal radius range of a device to connect to other devices (to send/receive messages)
-SCREEN_SCALE = 25.0 # pixels per unit, aka make the SCREENSIZE SCREEN_SCALE times as big as coordinate range of the 2D map
+SCREEN_SCALE = 35.0 # pixels per unit, aka make the SCREENSIZE SCREEN_SCALE times as big as coordinate range of the 2D map
 SCREEN_SIZE = (
     int(SCREEN_SCALE * W),
     int(SCREEN_SCALE * H)
@@ -78,25 +78,13 @@ def faded_color(col1, col2, f=1.0):
         int(col1[2] + (col2[2] - col1[2])*f))
 
 
-DEVICE_SIZE = 5
+DEVICE_SIZE = 7
+DEVICE_NUM_TEXT_COLOR = ('gray87', (222, 222, 222)) #('white', (255, 255, 255))
 SIGNAL_RING_THICKNESS = 3
 DOT_SIZE = 3
 
 ALL_CHARS = ''.join(set(string.printable) - set(string.whitespace)) # all printable characters except white space, used for key creation
 # source: https://docs.python.org/3/library/string.html
-
-
-
-
-
-OUTPUT_FRAME_RATE = False # flag if we want to print the frame rate to the console
-
-CONTROL_KEY = [
-	"Keyboard Controls:",
-	"	<space> = Pause/Play",
-	"	v = Toggle view drawing",
-	"	k = Toggle Control Key",
-]
 
 
 

@@ -32,6 +32,8 @@ class Device(object):
 		self.vel = self.set_velocity()
 		# print('src = (%.4f, %.4f)' % (self.src[0], self.src[1]))
 		self.n = Node(self.src[0], self.src[1], grid=False)
+		self.num = self.set_num(devices) # unique int from all the other devices
+
 
 		self.sent_messages = [] # messages sent this time step
 		self.message_dist  = None
@@ -87,6 +89,14 @@ class Device(object):
 		vel = MAX_VEL if vel > MAX_VEL else vel
 		return vel
 
+	def set_num(self, devices):
+
+		# find minimum positive integer this device could have
+		num = 0
+		while num in list(map(lambda d : d.num, devices)):
+			num += 1
+		return num
+
 	def reached_dst(self):
 		dst_dist = math.sqrt((self.n.x - self.dst[0])**2 + (self.n.y - self.dst[1])**2)
 		return dst_dist <= MAX_DST_DIST
@@ -130,3 +140,18 @@ class Device(object):
 	def print_d(self, num_devices='?', i='?', start_space='	', newline_start=False):
 		
 		self.n.print_n(num_nodes=num_devices, i=i, start_space=start_space, newline_start=newline_start)
+
+	def basic_info(self):
+		dn = self.n.neighbors
+		num_dn = len(dn.keys())
+		dn_info = str(dn)+'\n' if num_dn > 0 else ''
+		direct_neighbors_info = \
+			'%d Direct Neighbor%s:\n%s\n' % (
+				num_dn,
+				'' if num_dn == 1 else 's', # plural or singular
+				dn_info)#.to_string()
+		return \
+			'Device Number:   %d\n' % self.num + \
+			'Node Public Key: %s\n' % self.n.pk + \
+			'Node Secret Key: %s\n' % self.n.sk + \
+			direct_neighbors_info

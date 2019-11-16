@@ -45,11 +45,9 @@
 
             display stuff
 
-                is it possible to give the device the x,y coordiantes?
-                    possibly, but we might want to use longitude, latitude on the node process so its better they keep x and y
-
                 make it so when you click on a node
                     information appears about
+                        its unique identifier in the list
                         its public key
                         its neighbors' public keys and their estimated distance
 
@@ -90,19 +88,36 @@
             maybe pygame clock is better than time.time()
                 clock = pygame.time.Clock()
 
-            model could probably be made faster if we didn't copy over so much data
-                its done to avoid messing up the iteration by deleting during an iteration though
-                    if we could find a way to delete without messing up the iteration,
-                        for lists we could iterate by index and then decrement the index when we delete
-                        what about dictionaries though?
-                            aren't dictionary keys a set in python?
-                                does deleting from a set mess up iterating over it?
+            make simulation faster by:
 
-            model could be faster if we did more stuff in parallel using async lib
-                https://realpython.com/async-io-python/
+                model could probably be made faster if we didn't copy over so much data
+                    its done to avoid messing up the iteration by deleting during an iteration though
+                        if we could find a way to delete without messing up the iteration,
+                            for lists we could iterate by index and then decrement the index when we delete
+                            what about dictionaries though?
+                                aren't dictionary keys a set in python?
+                                    does deleting from a set mess up iterating over it?
 
-                Efficient Parallel Graph Algorithms in Python
-                https://pdfs.semanticscholar.org/54b9/22a51e5aa04e7512720348c2deda33e2e4ee.pdf
+                    searching through the code for places where we don't have to copy over data
+                    could be done simultaniously while we are searching for places to thread
+
+                model could be faster if we did more stuff in parallel using
+
+                    async lib
+                        https://realpython.com/async-io-python/
+
+                        Efficient Parallel Graph Algorithms in Python
+                        https://pdfs.semanticscholar.org/54b9/22a51e5aa04e7512720348c2deda33e2e4ee.pdf
+
+                    or just use basic threading
+                        see threading_example1.py
+
+                        once you thread it:
+                            in the console output
+                            change fps global variable to
+                                model.fps
+                                view.fps
+                                controller.fps
 
             make static map and cellular automata maps
                 figure out how to get a fully connected network that is distributed evenly
@@ -126,7 +141,7 @@
 
                         def get_network_recurrsively(d0, connections, network):
                             network += [n0]
-                            for c in connections[d0]: # self.set_direct_neighbors(n0, unvisited_nodes):
+                            for c in connections[d0]: # self.get_direct_neighbors(n0, unvisited_nodes):
                                 nd = c.keys[0] # nd = neighboring device
                                 if nd not in network:
                                     network = get_network_recurrsively(d, connections, network)
@@ -158,7 +173,7 @@
                         # while len(self.nodes) < N:
                         #     n = Node()
                         #     self.nodes.append(n)
-                        #     if len(self.set_direct_neighbors(n).keys()) == 0:
+                        #     if len(self.get_direct_neighbors(n).keys()) == 0:
                         #         self.nodes.remove(n)
                         # return self.nodes
 
@@ -171,7 +186,7 @@
                         # return self.nodes
 
                         nodes = [Node() for _ in range(N)]
-                        connections = self.set_connections(nodes)
+                        connections = self.get_network_state(nodes)
                         networks = self.get_networks(nodes, verbose=verbose)
                         return nodes, connections
 
@@ -193,7 +208,7 @@
                                     s += ('N' if isinstance(nodes[x*H+y], Node) else '*') + ' '
                                 print(s)
 
-                        connections = self.set_connections(nodes)
+                        connections = self.get_network_state(nodes)
                         # networks = self.get_networks(nodes, verbose=verbose)
                         return nodes, connections
                     def evolve_grid(self, verbose=False):
@@ -310,7 +325,7 @@
                         nodes = [non_empty_nodes[random.randint(len(non_empty_nodes))]] if nodes == [] else nodes
 
                         self.nodes = nodes
-                        self.connections = self.set_connections(self.nodes)
+                        self.connections = self.get_network_state(self.nodes)
 
                         if verbose:
                             print('Grid Evolution')
@@ -339,15 +354,14 @@
         '''
 
 import os
-os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
-os.environ['SDL_VIDEO_WINDOW_POS'] = "800,100" # set GUI window start position
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide" # don't display Pygame Intro at start of program
+os.environ['SDL_VIDEO_WINDOW_POS'] = "650,10" # set GUI window start position
 import time
 import copy
 import sys
 import math
 import random
 import pandas as pd
-pd.option_context('display.colheader_justify','right')
 from pygame.locals import QUIT, KEYDOWN
 from constants import *
 from node import Node
@@ -356,6 +370,56 @@ from message import Message
 import numpy as np
 from block_printer import BlockPrinter
 
+# global variables
+bp = BlockPrinter()
+fps = 0
+
+# create the string for the console output
+def update_console(caller=''):
+
+    # simulation metrics
+    sim_mtrcs = '\nSimulation Metrics:\n'
+    sim_mtrcs += 'fps = %d\n' % fps
+
+    # gui settings
+    df = view.settings
+    df = df.assign(state=lambda df : df.state.replace([True, False], ['ON', 'OFF'])) # convert True/False to ON/OFF
+    df_title = '\nGUI Settings:\n'
+    gui_settings = df_title + df.to_string() + '\n'
+
+    # network info
+    network_info = '\nNetwork Info:\n'
+    network_info += '%d Devices in the Network\n' % len(model.devices)
+    num_sub_nets = len(model.sub_networks)
+    network_info += '%d Sub-Network%s:\n' % (num_sub_nets, '' if num_sub_nets == 1 else 's')
+    sub_net_counts = list(map(lambda sub_net : len(sub_net), model.sub_networks))
+    max_spaces1 = len(str(num_sub_nets))
+    max_spaces2 = len(str(max(sub_net_counts)))
+    for i, (num_devices, sub_net) in enumerate(zip(sub_net_counts, model.sub_networks)):
+        i += 1
+        sub_net_devices = set(map(lambda d : d.num, sub_net))
+        num_spaces1 = max_spaces1 - len(str(i))
+        num_spaces2 = max_spaces2 - len(str(num_devices))
+        network_info += '   sub_net %d %shas %d %sdevice%s:%s %s\n' % (
+            i,
+            ' '*num_spaces1,
+            num_devices,
+            ' '*num_spaces2,
+            '' if num_devices == 1 else 's', ' ' if num_devices == 1 else '', # plural or singular
+            sub_net_devices)
+
+    # selected device info
+    sd = model.selected_device
+    selected_device_title = '\nSelected Device:\n'
+    selected_device_info = selected_device_title + \
+        (sd.basic_info() if sd != None else 'None\n')
+
+    bp.print(
+        caller+'\n' + \
+        sim_mtrcs + \
+        gui_settings + \
+        selected_device_info + \
+        network_info)
 
 
 
@@ -370,6 +434,7 @@ class View(object):
         self.show_controls = False # toggle control display
 
         init_settings = [
+            ('n',  'device number', True),
             ('c',  'connections',  True),
             ('d',  'message dots', True),
             ('r',  'signal rings', True),
@@ -386,9 +451,7 @@ class View(object):
             'draw'  : list(map(lambda x : x[1], init_settings)),
             'state' : list(map(lambda x : x[2], init_settings))
         }).set_index('key')
-        self.updated_settings = True
 
-        self.bp = BlockPrinter()
 
     def draw(self):
 
@@ -420,9 +483,6 @@ class View(object):
         # update display
         pygame.display.update()
 
-        # update console output
-        if self.updated_settings:
-            self.bp.print(self.create_console_output())
 
     def draw_selected_device_range(self):
         sd = self.model.selected_device
@@ -437,6 +497,10 @@ class View(object):
                 (x, y), r)
 
     def draw_devices(self):
+        if self.settings.at['n', 'state']:
+            fontcolor = DEVICE_NUM_TEXT_COLOR[1]
+            fontsize = 3 * DEVICE_SIZE
+            basicfont = pygame.font.SysFont(None, fontsize)
         sd = self.model.selected_device
         for d in model.devices:
             if not isinstance(d, Device): continue
@@ -447,6 +511,11 @@ class View(object):
                 self.surface,
                 color,
                 (x, y), DEVICE_SIZE) # (x,y), radius
+            if self.settings.at['n', 'state']:
+                text_render = basicfont.render('%d' % d.num, True, fontcolor)
+                x += DEVICE_SIZE * 0.90
+                y += DEVICE_SIZE * 0.90
+                self.surface.blit(text_render, (x, y)) # draw text
     def get_device_color(self, sd, d, sent_messages, dt):
 
         if  (not self.settings.at['f', 'state']) or \
@@ -790,36 +859,6 @@ class View(object):
                     (x, y), r,
                     SIGNAL_RING_THICKNESS) # (x,y), radius
 
-    def draw_text(self, text, x, y, size, \
-        text_color=(100, 100, 100), \
-        background_color=BACKGROUND_COLOR[0]):
-
-        # make text
-        basicfont = pygame.font.SysFont(None, size)
-        text_render = basicfont.render(text, True, text_color)
-        text_width = text_render.get_width()
-        text_height = text_render.get_height()
-
-        # draw background
-        pygame.draw.rect(self.surface, background_color, \
-            [x, y, text_width+50, text_height])
-
-        # draw text
-        self.surface.blit(text_render, (x, y))
-
-    def create_console_output(self):
-
-
-        df = self.settings
-        df = df.assign(state=lambda df : df.state.replace([True, False], ['ON', 'OFF'])) # convert True/False to ON/OFF
-        # df.style.set_properties(**{'text-align': 'right'}) # right allign text
-        # dfStyler = df.style.set_properties(**{'text-align': 'right'})
-        # dfStyler.set_table_styles([dict(selector='th', props=[('text-align', 'right')])])
-        display_controls = df.to_string()
-
-        self.updated_settings = False
-        return \
-            display_controls
 
 class Model(object):
 
@@ -830,7 +869,7 @@ class Model(object):
         # connections: {keys=devices : value={key=neighbor_device, value=distance}}
         # edges: [{device0, device1}, {device2, device0}, ...]
         self.devices = self.init_moving_devices(verbose=False)
-        self.connections, self.edges = self.set_connections(self.devices, verbose=False)
+        self.connections, self.edges, self.sub_networks = None, None, None
 
         # list of signals that are being broadcast. Used to simulate signal time delay in simulation
         # format: [{'sender_device':<Device>, 'dist_traveled':<float>, 'send_pt':<(float, float)>, 'message':<str>}, ...]
@@ -840,9 +879,10 @@ class Model(object):
         self.t1 = t # t1 = time of previous time step (1 time step in the past)
 
         # controller variables
-        self.selected_device = None # device user clicked on
+        self.selected_device = None  # device user clicked on
         self.pause_devices   = False # pause/play movement
         self.pause_signals   = False # pause/play signals
+
 
     # main_loop of the model
     def update(self, verbose=False):
@@ -850,6 +890,9 @@ class Model(object):
         t = time.time()
         self.dt = t - self.t1
         # if verbose: print('%s\nt = %s' % ('-'*180, t))
+
+        # update devices, connections, and edges, and sub-networks
+        self.get_network_state(self.devices)
 
         # move message signals forward,
         # deliver message if it's reached a node,
@@ -907,30 +950,7 @@ class Model(object):
                         'receiver_devices' : set() # ensures that a signal doesn't pass a node twice
                     })
 
-        ''' move the devices,
-            update devices, connections, and edges
-
-            there are a variable number of nodes on the map at any given time
-                ranging from N_MIN to N_MAX
-            the simulation starts with the midway point between N_MIN and N_MAX
-            when a node n0 reaches its destination dst
-                the simulation creates 0, 1 or 2 nodes
-                    if there are now <= N_MIN nodes left
-                        create 2
-                    elif there are now >= N_MAX nodes left
-                        create 0
-                    else:
-                        randomly pick between 0, 1, and 2
-                        if the number of nodes left is closer to N_MIN
-                            0 has a low chance
-                            1 has a medium chance
-                            2 has a high chance
-                        elif  the number of nodes left is closer to N_MAX
-                            0 has a high chance
-                            1 has a medium chance
-                            2 has a low chance
-
-            '''
+        # move the devices
         if not self.pause_devices:
             devices = []
             num_devices_that_reached_their_dst = 0
@@ -971,13 +991,35 @@ class Model(object):
                     devices.append(Device(devices))
 
             self.devices = devices
-            self.connections, self.edges = self.set_connections(self.devices)
 
         # update t1 at end of update()
         self.t1 = t
 
     # create devices that move around the map
     def init_moving_devices(self, verbose=False):
+        
+        ''' create devices,
+
+            there are a variable number of nodes on the map at any given time
+                ranging from N_MIN to N_MAX
+            the simulation starts with the midway point between N_MIN and N_MAX
+            when a node n0 reaches its destination dst
+                the simulation creates 0, 1 or 2 nodes
+                    if there are now <= N_MIN nodes left
+                        create 2
+                    elif there are now >= N_MAX nodes left
+                        create 0
+                    else:
+                        randomly pick between 0, 1, and 2
+                        if the number of nodes left is closer to N_MIN
+                            0 has a low chance
+                            1 has a medium chance
+                            2 has a high chance
+                        elif  the number of nodes left is closer to N_MAX
+                            0 has a high chance
+                            1 has a medium chance
+                            2 has a low chance
+            '''
         devices = []
         n_to_create = int(((N_MAX - N_MIN) / 2) + N_MIN) # create halfway between N_MIN and N_MAX
         while n_to_create > 0:
@@ -990,19 +1032,78 @@ class Model(object):
                 d.print_d(num_devices, i=i+1)
         return devices
 
-    # determine which devices are current within signal range of each other
-    # {keys=devices, value={key=neighbor_device : value=distance}}
-    def set_connections(self, devices, verbose=False):
-        connections = {} # {keys=devices : value={key=neighbor_device, value=distance}}
-        edges = [] # [{device0, device1}, {device2, device0}, ...]
+    # determine which devices are currently within signal range of each other
+    def get_network_state(self, devices, verbose=False):
+        connections = {}  # {keys=devices : value={key=neighbor_device, value=distance}}
+        edges = []        # [{device0, device1}, {device2, device0}, ...]
+        sub_networks = [] # [{device0, device1, device2}, {device3, device4}, ...]
+
+        # create connections and edges data structure,
+        # also make deep copy of devices in unvisted_devices for creating sub_networks in the next iteration
+        unvisited_devices = set()
         for d0 in devices:
             if not isinstance(d0, Device): continue
-            neighbors = self.set_direct_neighbors(d0, devices)
+            neighbors = self.get_direct_neighbors(d0, devices)
             connections[d0] = neighbors
             for d in neighbors.keys():
                 if {d0, d} not in edges:
                     edges.append({d0, d})
+            unvisited_devices.add(d0)
+        self.connections = connections
+        self.edges = edges
+
+        # find all sub_networks
+        # useful source for set operations
+        # https://dev.to/svinci/intersection-union-and-difference-of-sets-in-python-4gkn
+        while unvisited_devices != set():
+
+            # pick a random device in list of unvisited devices
+            d0 = unvisited_devices.pop()
+            neighbors = set(connections[d0].keys())
+            d0_and_neighbors = {d0} | neighbors
+
+            # if any of d0 or it's neighbors are in a sub_net
+            # put d0 and all its neighbors in that sub_net
+            sub_nets_to_add_to = {}
+            for i, sub_net in enumerate(sub_networks):
+                intersect = sub_net & d0_and_neighbors
+                if len(intersect) > 0:
+                    sub_nets_to_add_to[i] = sub_net
+            
+            # if d0_and_neighbors intersected exactly 1 sub_net,
+            # add them to that sub_net
+            if len(sub_nets_to_add_to) == 1:
+                i = list(sub_nets_to_add_to.keys())[0]
+                sub_net = sub_nets_to_add_to[i]
+                sub_networks[i] = sub_net | d0_and_neighbors # | = union
+
+            # elif d0_and_neighbors intersected multiple sub_nets,
+            # merge all the sub_nets together and add them to that
+            elif len(sub_nets_to_add_to) > 1:
+                merged_sub_net = set()
+                for i, sub_net in sub_nets_to_add_to.items():
+                    merged_sub_net = merged_sub_net | sub_net
+                    sub_networks.remove(sub_net)
+                merged_sub_net = merged_sub_net | d0_and_neighbors
+                sub_networks.append(merged_sub_net)
+
+            # else d0_and_neighbors didn't intersect any sub_nets,
+            # so create a new sub_net for them
+            else: # len(sub_nets_to_add_to) == 0:
+                sub_networks.append(d0_and_neighbors)
+
+        # update networks in console output if it changed
+        sub_networks.sort()
+        if sub_networks != self.sub_networks:
+            self.sub_networks = sub_networks
+            update_console(caller='update sub-networks')
+        else: self.sub_networks = sub_networks
+
         if verbose:
+
+            print('\nNetwork State:')
+            print('%d Devices in the network\n' % len(devices))
+
             print('\nConnections:')
             num_devices = len(devices)
             for i, (d0, neighbors) in enumerate(connections.items()):
@@ -1013,6 +1114,7 @@ class Model(object):
                 if num_neighbors > 0:
                     for j, neighbor in enumerate(neighbors):
                         neighbor.print_d(num_devices=num_neighbors, i=j+1, start_space='        ')
+
             print('\n%d Edges:' % len(edges))
             for i, edge in enumerate(edges):
                 edge = tuple(edge)
@@ -1021,12 +1123,29 @@ class Model(object):
                 d1.print_d(num_devices=2, i=1, start_space='        ')
                 d2.print_d(num_devices=2, i=2, start_space='        ')
                 print()
+
+            num_sub_nets = len(sub_networks)
+            print('\n%d Sub-Networks:' % len(sub_networks))
+            sub_net_counts = list(map(lambda sub_net : len(sub_net), sub_networks))
+            max_spaces1 = len(str(num_sub_nets))
+            max_spaces2 = len(str(max(sub_net_counts)))
+            for i, (num_devices, sub_net) in enumerate(zip(sub_net_counts, sub_networks)):
+                i += 1
+                sub_net_devices = set(map(lambda d : d.num, sub_net))
+                num_spaces1 = max_spaces1 - len(str(i))
+                num_spaces2 = max_spaces2 - len(str(num_devices))
+                print('   sub_net %d %shas %d %sdevice%s:%s %s' % (
+                    i,
+                    ' '*num_spaces1,
+                    num_devices,
+                    ' '*num_spaces2,
+                    '' if num_devices == 1 else 's', ' ' if num_devices == 1 else '', # plural or singular
+                    sub_net_devices))
             print()
-        return connections, edges
 
     # determine which devices are within signal range of device d0
     # {key=neighboring device : value=distance}
-    def set_direct_neighbors(self, d0, devices, verbose=False):
+    def get_direct_neighbors(self, d0, devices, verbose=False):
         neighbors = {} # {key = neighboring device : value = distance}
         for d in devices:
             if not isinstance(d0, Device): continue
@@ -1060,14 +1179,13 @@ class Controller(object):
                 mx, my = mouse_pos[0], mouse_pos[1]
                 if verbose: print('mouse position = (%d,%d)' % (mx, my))
 
-                if event.button == 4:
+                if   event.button == 4:
                     if verbose: print('mouse wheel scroll up')
                 elif event.button == 5:
                     if verbose: print('mouse wheel scroll down')
                 elif event.button == 1:
                     if verbose: print('mouse left click')
                     self.model.selected_device = self.select_or_deselect_device(mx, my, verbose=False)
-
                 elif event.button == 3:
                     if verbose: print('mouse right click') # 2 finger click on Mac
                 else:
@@ -1085,6 +1203,7 @@ class Controller(object):
         elif event.key == pygame.K_r: self.update_view_settings('r') # toggle draw signal rings
         elif event.key == pygame.K_c: self.update_view_settings('c') # toggle draw connection lines
         elif event.key == pygame.K_f: self.update_view_settings('f') # toggle draw node flash from signal
+        elif event.key == pygame.K_n: self.update_view_settings('n') # toggle draw device number
 
         elif event.key == pygame.K_RETURN:
             if verbose: print('self.buffer = %s' % self.buffer)
@@ -1120,16 +1239,17 @@ class Controller(object):
         # if keys[pygame.K_UP]:
         #     pass # etc. ...
     def update_view_settings(self, key, verbose=False):
-            current_state = self.view.settings.loc[key]['state']
-            self.view.settings.at[key, 'state'] = not current_state
-            self.view.updated_settings = True
-            if verbose: print('%s = %s' % (key, self.view.settings.loc[key]['state']))
+        current_state = self.view.settings.loc[key]['state']
+        self.view.settings.at[key, 'state'] = not current_state
+        update_console(caller='update view state')
+        if verbose: print('%s = %s' % (key, self.view.settings.loc[key]['state']))
 
     # click unselected device to select it,
     # click selected device again to deselect it
     def select_or_deselect_device(self, mx, my, verbose=False):
         x, y = mx / SCREEN_SCALE, my / SCREEN_SCALE # mx and my are scaled to display, not the model
         selected_device = self.find_closest_device(x, y, verbose=False)
+        update_console(caller='selected_device')
         if model.selected_device == None:
             return selected_device
         else:
@@ -1160,11 +1280,12 @@ class Controller(object):
 
 if __name__ == '__main__':
 
-    # pygame setup
+    # setup
     pygame.init()
     model = Model()
     view = View(model)
     controller = Controller(model, view)
+
 
     # frame rate variables
     start_time = time.time()
@@ -1173,12 +1294,12 @@ if __name__ == '__main__':
     while True:
 
         # output frame rate
-        if OUTPUT_FRAME_RATE:
-            iterations += 1
-            if time.time() - start_time > 1:
-                start_time += 1
-                print('%s fps' % iterations)
-                iterations = 0
+        iterations += 1
+        if time.time() - start_time > 1:
+            start_time += 1
+            fps = iterations
+            update_console(caller='update frame rate')
+            iterations = 0
 
         # handle user input
         for event in pygame.event.get():
@@ -1193,6 +1314,7 @@ if __name__ == '__main__':
 
         # display the view
         view.draw()
-        view.screen.blit(view.surface, (0,0))
+        view.screen.blit(view.surface, (0, 0))
         pygame.display.update()
+
         # time.sleep(1.0) # control frame rate (in seconds)
