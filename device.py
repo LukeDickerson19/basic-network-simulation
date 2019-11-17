@@ -144,12 +144,11 @@ class Device(object):
 	def basic_info(self):
 		dn = self.n.neighbors
 		num_dn = len(dn.keys())
-		dn_info = str(dn)+'\n' if num_dn > 0 else ''
 		direct_neighbors_info = \
 			'%d Direct Neighbor%s:\n%s\n' % (
 				num_dn,
 				'' if num_dn == 1 else 's', # plural or singular
-				dn_info)#.to_string()
+				dn.to_string() if num_dn > 0 else '')
 		return \
 			'Device Number:   %d\n' % self.num + \
 			'Node Public Key: %s\n' % self.n.pk + \

@@ -5,6 +5,8 @@ from constants import *
 from message import Message
 import pandas as pd
 
+
+
 class Node(object):
 
 	def __init__(self, x, y, grid=True):
@@ -50,7 +52,13 @@ class Node(object):
 			}
 
 			'''
-		self.neighbors = {}
+		self.neighbors = pd.DataFrame({
+			'public_key'     : [],
+			'estimated_dist' : []
+		}) # other nodes get on this list by returning a ping
+		self.potential_neighbors = {
+
+		} # other nodes get on this list by sending this node a ping
 
 		# map of pings to the time they were sent out
 		# key   = ping random string
@@ -154,6 +162,13 @@ class Node(object):
 
 			elif message.m.startswith('ECHO'):
 				pass
+				# check if the random string returned is in the list of random strings you sent out in the near past
+				# if yes:
+					# add them to your list of neighbors
+					# estimate their distance
+
+					# i need some way to take nodes off the list
+					# if they dont return a ping, they're taken off
 
 			else: # default of switch (why doesn't python have switches?)
 				unread_messages.append(message)

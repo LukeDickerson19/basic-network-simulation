@@ -47,17 +47,8 @@
 
                 make it so when you click on a node
                     information appears about
-                        its unique identifier in the list
-                        its public key
-                        its neighbors' public keys and their estimated distance
-
-                        ... in the terminal
-                            look into how to write over old text in the the terminal
-                            so terminal output is constant
-                                maybe display network metrics
-                                maybe display key commands (toggleable)
-
-                        ... and set verbose=False to everything else
+                        its neighbors' public keys, their estimated distance, and their actual distance
+                            put it all in a pandas dataframe
 
                 increase signal speed a lot
                 increase ping period a little bit
@@ -73,6 +64,7 @@
 
             would it be possible to transfer x and y to Device instead of Node?
                 check all uses of x and y in main and in Node and in Device and in constants
+                    don't do this because the Node's might want to use x, y in their social dynamics
 
             controls stuff
 
@@ -372,10 +364,11 @@ from block_printer import BlockPrinter
 
 # global variables
 bp = BlockPrinter()
-fps = 0
+fps = 0 # frames per second
 
-# create the string for the console output
+# print block to the console
 def update_console(caller=''):
+    caller = caller+'\n' if False else '' # display/mute caller output
 
     # simulation metrics
     sim_mtrcs = '\nSimulation Metrics:\n'
@@ -383,9 +376,14 @@ def update_console(caller=''):
 
     # gui settings
     df = view.settings
-    df = df.assign(state=lambda df : df.state.replace([True, False], ['ON', 'OFF'])) # convert True/False to ON/OFF
+    df = df.assign(STATE=lambda df : df.STATE.replace([True, False], ['ON', 'OFF'])) # convert True/False to ON/OFF
     df_title = '\nGUI Settings:\n'
     gui_settings = df_title + df.to_string() + '\n'
+
+    # selected device info
+    sd = model.selected_device
+    selected_device_info = '\nSelected Device:\n'
+    selected_device_info += sd.basic_info() if sd != None else 'None\n'
 
     # network info
     network_info = '\nNetwork Info:\n'
@@ -393,8 +391,7 @@ def update_console(caller=''):
     num_sub_nets = len(model.sub_networks)
     network_info += '%d Sub-Network%s:\n' % (num_sub_nets, '' if num_sub_nets == 1 else 's')
     sub_net_counts = list(map(lambda sub_net : len(sub_net), model.sub_networks))
-    max_spaces1 = len(str(num_sub_nets))
-    max_spaces2 = len(str(max(sub_net_counts)))
+    max_spaces1, max_spaces2 = len(str(num_sub_nets)), len(str(max(sub_net_counts)))
     for i, (num_devices, sub_net) in enumerate(zip(sub_net_counts, model.sub_networks)):
         i += 1
         sub_net_devices = set(map(lambda d : d.num, sub_net))
@@ -408,14 +405,9 @@ def update_console(caller=''):
             '' if num_devices == 1 else 's', ' ' if num_devices == 1 else '', # plural or singular
             sub_net_devices)
 
-    # selected device info
-    sd = model.selected_device
-    selected_device_title = '\nSelected Device:\n'
-    selected_device_info = selected_device_title + \
-        (sd.basic_info() if sd != None else 'None\n')
-
+    # print them in a stationary block
     bp.print(
-        caller+'\n' + \
+        caller + \
         sim_mtrcs + \
         gui_settings + \
         selected_device_info + \
@@ -447,10 +439,10 @@ class View(object):
             ('m1', 'messages of direct neighbors of selected device', False)
         ]
         self.settings = pd.DataFrame({
-            'key'   : list(map(lambda x : x[0], init_settings)),
-            'draw'  : list(map(lambda x : x[1], init_settings)),
-            'state' : list(map(lambda x : x[2], init_settings))
-        }).set_index('key')
+            'KEY'   : list(map(lambda x : x[0], init_settings)),
+            'DRAW'  : list(map(lambda x : x[1], init_settings)),
+            'STATE' : list(map(lambda x : x[2], init_settings))
+        }).set_index('KEY')
 
 
     def draw(self):
@@ -460,11 +452,11 @@ class View(object):
 
 
         self.draw_selected_device_range()
-        if self.model.selected_device != None and self.settings.at['r', 'state']:
+        if self.model.selected_device != None and self.settings.at['r', 'STATE']:
             self.draw_signals()
-        if self.settings.at['c', 'state']: 
+        if self.settings.at['c', 'STATE']: 
             self.draw_in_range_connections()
-        if self.model.selected_device != None and self.settings.at['d', 'state']:
+        if self.model.selected_device != None and self.settings.at['d', 'STATE']:
             self.draw_messages()
         # self.draw_paths_to_dst()
         self.draw_devices()
@@ -483,7 +475,6 @@ class View(object):
         # update display
         pygame.display.update()
 
-
     def draw_selected_device_range(self):
         sd = self.model.selected_device
         if sd != None:
@@ -497,7 +488,7 @@ class View(object):
                 (x, y), r)
 
     def draw_devices(self):
-        if self.settings.at['n', 'state']:
+        if self.settings.at['n', 'STATE']:
             fontcolor = DEVICE_NUM_TEXT_COLOR[1]
             fontsize = 3 * DEVICE_SIZE
             basicfont = pygame.font.SysFont(None, fontsize)
@@ -511,22 +502,22 @@ class View(object):
                 self.surface,
                 color,
                 (x, y), DEVICE_SIZE) # (x,y), radius
-            if self.settings.at['n', 'state']:
+            if self.settings.at['n', 'STATE']:
                 text_render = basicfont.render('%d' % d.num, True, fontcolor)
                 x += DEVICE_SIZE * 0.90
                 y += DEVICE_SIZE * 0.90
                 self.surface.blit(text_render, (x, y)) # draw text
     def get_device_color(self, sd, d, sent_messages, dt):
 
-        if  (not self.settings.at['f', 'state']) or \
+        if  (not self.settings.at['f', 'STATE']) or \
             (sd == None) or \
             (sd != d and (not (d in self.model.connections[sd]))):
             return pygame.Color(DEVICE_DEFAULT_COLOR[0])
 
         if d == sd: # selected device
-            _p, _e, _m = self.settings.at['p0', 'state'], self.settings.at['e0', 'state'], self.settings.at['m0', 'state']
+            _p, _e, _m = self.settings.at['p0', 'STATE'], self.settings.at['e0', 'STATE'], self.settings.at['m0', 'STATE']
         else: # neighbor
-            _p, _e, _m = self.settings.at['p1', 'state'], self.settings.at['e1', 'state'], self.settings.at['m1', 'state']
+            _p, _e, _m = self.settings.at['p1', 'STATE'], self.settings.at['e1', 'STATE'], self.settings.at['m1', 'STATE']
         p, e, m = False, False, False
         for m in sent_messages:
             if _m:
@@ -540,9 +531,9 @@ class View(object):
                     d.most_recent_message_type = 'ping'
             elif _e and m.m.startswith('ECHO'):
 
-                # if self.settings.at['e1', 'state']: only do echo's meant for the sd (if e1 )
-                # if self.settings.at['e0', 'state']: draw all its (the sd's) echos
-                if self.settings.at['e1', 'state']:
+                # if self.settings.at['e1', 'STATE']: only do echo's meant for the sd (if e1 )
+                # if self.settings.at['e0', 'STATE']: draw all its (the sd's) echos
+                if self.settings.at['e1', 'STATE']:
                     rs = m.m.split('\n')[3] # rs = random string
                     if rs not in sd.n.pings.keys():
                         continue
@@ -643,15 +634,15 @@ class View(object):
             if not (
                 (
                     d0 == sd and (
-                        (self.settings.at['m0', 'state']) or
-                        (self.settings.at['p0', 'state'] and signal['message_type'] == 'ping') or
-                        (self.settings.at['e0', 'state'] and signal['message_type'] == 'echo')
+                        (self.settings.at['m0', 'STATE']) or
+                        (self.settings.at['p0', 'STATE'] and signal['message_type'] == 'ping') or
+                        (self.settings.at['e0', 'STATE'] and signal['message_type'] == 'echo')
                     )
                 ) or (
                     d0 in self.model.connections[sd] and (
-                        (self.settings.at['m1', 'state']) or
-                        (self.settings.at['p1', 'state'] and signal['message_type'] == 'ping') or
-                        (self.settings.at['e1', 'state'] and signal['message_type'] == 'echo')
+                        (self.settings.at['m1', 'STATE']) or
+                        (self.settings.at['p1', 'STATE'] and signal['message_type'] == 'ping') or
+                        (self.settings.at['e1', 'STATE'] and signal['message_type'] == 'echo')
                     )
                 )
             ): continue
@@ -757,15 +748,15 @@ class View(object):
             if not (
                 (
                     d0 == sd and (
-                        (self.settings.at['m0', 'state']) or
-                        (self.settings.at['p0', 'state'] and signal['message_type'] == 'ping') or
-                        (self.settings.at['e0', 'state'] and signal['message_type'] == 'echo')
+                        (self.settings.at['m0', 'STATE']) or
+                        (self.settings.at['p0', 'STATE'] and signal['message_type'] == 'ping') or
+                        (self.settings.at['e0', 'STATE'] and signal['message_type'] == 'echo')
                     )
                 ) or (
                     d0 in self.model.connections[sd] and (
-                        (self.settings.at['m1', 'state']) or
-                        (self.settings.at['p1', 'state'] and signal['message_type'] == 'ping') or
-                        (self.settings.at['e1', 'state'] and signal['message_type'] == 'echo')
+                        (self.settings.at['m1', 'STATE']) or
+                        (self.settings.at['p1', 'STATE'] and signal['message_type'] == 'ping') or
+                        (self.settings.at['e1', 'STATE'] and signal['message_type'] == 'echo')
                     )
                 )
             ): continue
@@ -1186,6 +1177,7 @@ class Controller(object):
                 elif event.button == 1:
                     if verbose: print('mouse left click')
                     self.model.selected_device = self.select_or_deselect_device(mx, my, verbose=False)
+                    update_console(caller='selected device')
                 elif event.button == 3:
                     if verbose: print('mouse right click') # 2 finger click on Mac
                 else:
@@ -1239,17 +1231,16 @@ class Controller(object):
         # if keys[pygame.K_UP]:
         #     pass # etc. ...
     def update_view_settings(self, key, verbose=False):
-        current_state = self.view.settings.loc[key]['state']
-        self.view.settings.at[key, 'state'] = not current_state
+        current_state = self.view.settings.loc[key]['STATE']
+        self.view.settings.at[key, 'STATE'] = not current_state
         update_console(caller='update view state')
-        if verbose: print('%s = %s' % (key, self.view.settings.loc[key]['state']))
+        if verbose: print('%s = %s' % (key, self.view.settings.loc[key]['STATE']))
 
     # click unselected device to select it,
     # click selected device again to deselect it
     def select_or_deselect_device(self, mx, my, verbose=False):
         x, y = mx / SCREEN_SCALE, my / SCREEN_SCALE # mx and my are scaled to display, not the model
         selected_device = self.find_closest_device(x, y, verbose=False)
-        update_console(caller='selected_device')
         if model.selected_device == None:
             return selected_device
         else:
