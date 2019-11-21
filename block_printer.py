@@ -14,7 +14,7 @@ class BlockPrinter:
 
     def print(self, text, end='\n'):
 
-        # Clear previous text by overwritig non-spaces with spaces
+        # Clear previous text by overwriting non-spaces with spaces
         self.clear()
 
         # Print new text

@@ -138,7 +138,7 @@ class Device(object):
 		return self.reached_dst()
 
 	def print_d(self, num_devices='?', i='?', start_space='	', newline_start=False):
-		
+
 		self.n.print_n(num_nodes=num_devices, i=i, start_space=start_space, newline_start=newline_start)
 
 	def basic_info(self):
@@ -150,7 +150,7 @@ class Device(object):
 				'' if num_dn == 1 else 's', # plural or singular
 				dn.to_string() if num_dn > 0 else '')
 		return \
-			'Device Number:   %d\n' % self.num + \
+			'Device Number:   %d\n' % self.num  + \
 			'Node Public Key: %s\n' % self.n.pk + \
 			'Node Secret Key: %s\n' % self.n.sk + \
 			direct_neighbors_info

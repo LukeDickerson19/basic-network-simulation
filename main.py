@@ -53,7 +53,22 @@
                 make it so when you click on a node
                     information appears about
                         its neighbors' public keys, their estimated distance, and their actual distance
-                            put it all in a pandas dataframe
+
+                    ... for some reason its not updating the terminal display when the number of neighbors
+                    ... for the selected devices changes
+                    ... its also saying sd.n.neighbors is an empty pd dataframe when it shouldn't be empty
+
+                        don't forget, the neighbors field in the console dispay is its ACTUAL neighbors,
+                            not the neighbors the sd thinks it has, the
+                        maybe make a list of actual neighbors and actual dist,
+                        and then make a separate list of believed neighbors
+
+                        1st figure out how to update it the moment it changes
+                        then figure out how to display the proper number of ACTUAL neighbors
+                        then figure out how to display the actual distance from those neighbors
+                        then figure out how to display the df of the believed neighbors
+                        then check to see how accurate the estimated distance is from the real distance
+                            especially after you change the variables below!
 
                 increase signal speed a lot
                 increase ping period a little bit
@@ -66,13 +81,6 @@
                     determine range of average cell tower:
                         45 miles
                         https://www.google.com/search?q=cell+tower+range&oq=cell+tower+range&aqs=chrome..69i57j0l5.3071j0j7&sourceid=chrome&ie=UTF-8
-
-            put echo parse and ping parse in fns in node class (or separate file) and call them
-                this is just to have them in one easily modifiable place
-
-            would it be possible to transfer x and y to Device instead of Node?
-                check all uses of x and y in main and in Node and in Device and in constants
-                    don't do this because the Node's might want to use x, y in their social dynamics
 
             controls stuff
 
@@ -466,7 +474,7 @@ class View(object):
         self.draw_selected_device_range()
         if self.model.selected_device != None and self.settings.at['r', 'STATE']:
             self.draw_signals()
-        if self.settings.at['c', 'STATE']: 
+        if self.settings.at['c', 'STATE']:
             self.draw_in_range_connections()
         if self.model.selected_device != None and self.settings.at['d', 'STATE']:
             self.draw_messages()
@@ -546,7 +554,7 @@ class View(object):
                 # if self.settings.at['e1', 'STATE']: only do echo's meant for the sd (if e1 )
                 # if self.settings.at['e0', 'STATE']: draw all its (the sd's) echos
                 if self.settings.at['e1', 'STATE']:
-                    rs = m.m.split('\n')[3] # rs = random string
+                    _, rs, _ = d.n.parse_echo(m) # rs = random string
                     if rs not in sd.n.pings.keys():
                         continue
 
@@ -674,7 +682,7 @@ class View(object):
             if signal['message_type'] == 'echo': # only draw echo dot to intended receiver_node
                 nd = edge[0] if edge[1] == sd else edge[1] # nd = neighboring device (of selected device)
                 rd = nd if sn == sd.n else sd # rd = receiver device
-                rn_id = signal['message'].m.split('\n')[1].split(' ')[2] # receiver node according to echo message
+                rn_id, _, _ = sd.n.parse_echo(signal['message']) # receiver node according to echo message
                 if rd.n.sk != rn_id: continue
                 if {rd, signal['sender_device']} != _edge: continue # only draw on the edge with both sender and receiver device
             if signal['message_type'] == 'ping':
@@ -774,7 +782,8 @@ class View(object):
             ): continue
 
             if signal['message_type'] == 'echo': # only draw echo dot to intended receiver_node
-                rn_id = signal['message'].m.split('\n')[1].split(' ')[2] # rn_id = receiver node id
+                rn_id, _, _ = sd.n.parse_echo(signal['message']) # rn_id = receiver node id
+
                 if d0 == sd:
                     pass # draw signal for all echos
                 else:
@@ -830,7 +839,7 @@ class View(object):
                     a1 = theta1 + theta2
                     a2 = theta1 - theta2
                     rect = [_x - _r, _y - _r, 2*_r, 2*_r]
-                   
+
                     pygame.draw.arc(
                         self.surface,
                         faded_color(
@@ -854,7 +863,7 @@ class View(object):
             r = int(SCREEN_SCALE * signal['dist_traveled'])
             if r > SIGNAL_RING_THICKNESS:
                 x = int(SCREEN_SCALE * signal['send_pt'][0])
-                y = int(SCREEN_SCALE * signal['send_pt'][1])        
+                y = int(SCREEN_SCALE * signal['send_pt'][1])
                 color = pygame.Color(color)
                 pygame.draw.circle(
                     self.surface,
@@ -916,11 +925,12 @@ class Model(object):
                 for d in self.devices:
                     if d != sd:
 
-                        # put the signal's message in device d's mailbox if the signal just passed d
+                        # if the signal just passed d, put the signal's message
+                        # and the current time in device d's mailbox
                         dist_sp_to_d = math.sqrt((d.n.x - x)**2 + (d.n.y - y)**2)
                         if prev_signal_dist <= dist_sp_to_d <= signal['dist_traveled'] \
                         and d not in signal['receiver_devices']:
-                            d.n.mailbox.append(signal['message'])
+                            d.n.mailbox.append((signal['message'], t))
                             signal['receiver_devices'].add(d)
 
                 # remove message that have reached the max signal range
@@ -1000,7 +1010,7 @@ class Model(object):
 
     # create devices that move around the map
     def init_moving_devices(self, verbose=False):
-        
+
         ''' create devices,
 
             there are a variable number of nodes on the map at any given time
@@ -1072,7 +1082,7 @@ class Model(object):
                 intersect = sub_net & d0_and_neighbors
                 if len(intersect) > 0:
                     sub_nets_to_add_to[i] = sub_net
-            
+
             # if d0_and_neighbors intersected exactly 1 sub_net,
             # add them to that sub_net
             if len(sub_nets_to_add_to) == 1:

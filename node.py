@@ -19,6 +19,7 @@ class Node(object):
 		self.pk = '' # pk = public key
 
 		# messages this node has received
+		# [(message1, time_received_message1), (message2, time_received_message2), ...]
 		self.mailbox = []
 
 		''' Graph of nodes this node is connected to.
@@ -87,7 +88,7 @@ class Node(object):
 	def update_ping_list(self, p, t):
 
 		# save most recent ping
-		rs = p.m.split('\n')[3] # rs = random string of ping
+		rs, _ = self.parse_ping(p)
 		self.pings[rs] = t
 
 		# trim old pings that are out of range R
@@ -108,13 +109,15 @@ class Node(object):
 
 	def ping(self, verbose=False):
 		random_string = self.create_random_string()
-		m = 'PING\n' + \
-			'Hi,\n' + \
-			'Send me back this random string.\n' + \
-			'%s\n' % random_string + \
-			'and sign it please.\n' + \
-			'Sincerely,\n' + \
-			'Node: %s\n' % self.sk
+		m = '\n'.join([
+			'PING',
+			'Hi,',
+			'Send me back this random string',
+			'%s' % random_string,
+			'and sign it please.',
+			'Sincerely,',
+			'Node: %s' % self.sk
+		])
 		# m = \
 		# 	'PING!\n' + \
 		# 	'Hi Node: %s\n' %  + \
@@ -128,47 +131,70 @@ class Node(object):
 		# 	'Node: %s\n' % self.pk)
 		if verbose:
 			print(time.ctime())
-			print('MY')
 			print(m)
 		return self.send_message(m)
+	def parse_ping(self, p):
+		random_string = p.m.split('\n')[3]
+		sender_node   = p.m.split('\n')[-1].split(' ')[1]
+		return random_string, sender_node
 
 	def echo(self, m, verbose=False):
-		sender_node = m.m.split('\n')[-2].split(' ')[1]
-		random_string = m.m.split('\n')[3]
-		m = 'ECHO\n' + \
-			'Hi Node: %s\n' % sender_node + \
-			'This is the string you sent me.\n' + \
-			'%s\n' % random_string + \
-			'Sincerely,\n' + \
-			'Node: %s\n' % self.sk
-		# putting sender_node in echo is used to only draw the echo dot to sender_node
+		random_string, sender_node = self.parse_ping(m)
+		m = '\n'.join([
+			'ECHO',
+			'Hi Node: %s' % sender_node,
+			'This is the string you sent me.',
+			'%s' % random_string,
+			'Sincerely,',
+			'Node: %s' % self.sk
+		])
 		if verbose:
 			print(time.ctime())
-			print('MY')
+			print('echo message:')
 			print(m)
 		return self.send_message(m)
+	def parse_echo(self, e):
+		pinging_node  = e.m.split('\n')[1].split(' ')[2]
+		random_string = e.m.split('\n')[3]
+		echoing_node  = e.m.split('\n')[-1].split(' ')[1]
+		return pinging_node, random_string, echoing_node
+	def process_echo(self, e, t):
+
+		# if yes:
+		#	add them to your list of neighbors
+		#	estimate their distance
+
+		#	i need some way to take nodes off the list
+		#	if they dont return a ping, they're taken off
+
+		pn, rs, en = self.parse_echo(e)
+		try:
+			# check if the random string returned
+			# is in the list of random strings you
+			# sent out in the near past
+			pt = self.pings[rs]
+			ed = ((t - pt) / 2.0) * SIGNAL_SPEED # ed = estimated distance
+			self.neighbors.append(pd.DataFrame({
+				'public_key'     : en,
+				'estimated_dist' : ed
+			}))
+		except:
+			pass
 
 	def respond_to_messages(self, verbose=False):
 		messages_to_send = []
 		unread_messages  = []
-		for i, message in enumerate(self.mailbox):
+		for i, (message, t) in enumerate(self.mailbox):
 			if message.m.startswith('PING'):
 				if verbose:
 					print(time.ctime())
-					print('message %d out of %d messages in mailbox' % (i, len(self.mailbox)))
+					print('message %d out of %d messages in mailbox' % (i+1, len(self.mailbox)))
 					print('THEIR')
 					print(message.m)
 				messages_to_send.append(self.echo(message, verbose=verbose))
 
 			elif message.m.startswith('ECHO'):
-				pass
-				# check if the random string returned is in the list of random strings you sent out in the near past
-				# if yes:
-					# add them to your list of neighbors
-					# estimate their distance
-
-					# i need some way to take nodes off the list
-					# if they dont return a ping, they're taken off
+				self.process_echo(message, t)
 
 			else: # default of switch (why doesn't python have switches?)
 				unread_messages.append(message)
