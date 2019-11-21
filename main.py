@@ -45,43 +45,28 @@
 
             display stuff
 
-
-                the the block_printer fucks up when the text has more lines than the console can display
-                    depending one however zoomed in the console text is
-                    it would be awesome if this could be accounted for                
-
                 percieved neighbors needs to be updated automatically
                     also, it might just be because its not auto-updated,
                     but why is it taking so long for a node to perceive all its neighbors?
                         it should take just one ping and subsequent echo to notice it
 
+                        test this on home computer
+                        ... it seems to work on work computer
+
+                make it so you can click a button (x) and start the simulation over
+                    reset t also
+
                 i need some way to take other nodes off a nodes neighbors list
                 if they dont return a ping, they're taken off
 
-                t needs to be paused to when movement and signals a both simulaniously paused
+                    also need to make sure the estimated distance is updated each echo it receives
+                    and make sure it doesn't have duplicatess
 
-                make it so you can click a button (r) and start the simulation over
-                    reset t also
+                t needs to be paused too when movement and signals a both simulaniously paused
 
-                make it so when you click on a node
-                    information appears about
-                        its neighbors' public keys, their estimated distance, and their actual distance
-
-                    ... for some reason its not updating the terminal display when the number of neighbors
-                    ... for the selected devices changes
-                    ... its also saying sd.n.neighbors is an empty pd dataframe when it shouldn't be empty
-
-                        don't forget, the neighbors field in the console dispay is its ACTUAL neighbors,
-                            not the neighbors the sd thinks it has, the
-                        maybe make a list of actual neighbors and actual dist,
-                        and then make a separate list of believed neighbors
-
-                        1st figure out how to update it the moment it changes
-                        then figure out how to display the proper number of ACTUAL neighbors
-                        then figure out how to display the actual distance from those neighbors
-                        then figure out how to display the df of the believed neighbors
-                        then check to see how accurate the estimated distance is from the real distance
-                            especially after you change the variables below!
+                the the block_printer fucks up when the text has more lines than the console can display
+                    depending one however zoomed in the console text is
+                    it would be awesome if this could be accounted for
 
                 increase signal speed a lot
                 increase ping period a little bit
