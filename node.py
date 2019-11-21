@@ -87,7 +87,7 @@ class Node(object):
 	def update_ping_list(self, p, t):
 
 		# save most recent ping
-		rs = p.m.split('\n')[3] # rs = random string of ping
+		rs, _ = self.parse_ping(p)
 		self.pings[rs] = t
 
 		# trim old pings that are out of range R
@@ -108,13 +108,15 @@ class Node(object):
 
 	def ping(self, verbose=False):
 		random_string = self.create_random_string()
-		m = 'PING\n' + \
-			'Hi,\n' + \
-			'Send me back this random string.\n' + \
-			'%s\n' % random_string + \
-			'and sign it please.\n' + \
-			'Sincerely,\n' + \
-			'Node: %s\n' % self.sk
+		m = '\n'.join([
+			'PING',
+			'Hi,',
+			'Send me back this random string',
+			'%s' % random_string,
+			'and sign it please.',
+			'Sincerely,',
+			'Node: %s' % self.sk
+		])
 		# m = \
 		# 	'PING!\n' + \
 		# 	'Hi Node: %s\n' %  + \
@@ -128,25 +130,33 @@ class Node(object):
 		# 	'Node: %s\n' % self.pk)
 		if verbose:
 			print(time.ctime())
-			print('MY')
 			print(m)
 		return self.send_message(m)
+	def parse_ping(self, p):
+		random_string = p.m.split('\n')[3]
+		sender_node   = p.m.split('\n')[-1].split(' ')[1]
+		return random_string, sender_node
 
 	def echo(self, m, verbose=False):
-		sender_node = m.m.split('\n')[-2].split(' ')[1]
-		random_string = m.m.split('\n')[3]
-		m = 'ECHO\n' + \
-			'Hi Node: %s\n' % sender_node + \
-			'This is the string you sent me.\n' + \
-			'%s\n' % random_string + \
-			'Sincerely,\n' + \
-			'Node: %s\n' % self.sk
-		# putting sender_node in echo is used to only draw the echo dot to sender_node
+		random_string, sender_node = self.parse_ping(m)
+		m = '\n'.join([
+			'ECHO',
+			'Hi Node: %s' % sender_node,
+			'This is the string you sent me.',
+			'%s' % random_string,
+			'Sincerely,',
+			'Node: %s' % self.sk
+		])
 		if verbose:
 			print(time.ctime())
-			print('MY')
+			print('echo message:')
 			print(m)
 		return self.send_message(m)
+	def parse_echo(self, e):
+		pinging_node  = e.m.split('\n')[1].split(' ')[2]
+		random_string = e.m.split('\n')[3]
+		echoing_node  = e.m.split('\n')[-1].split(' ')[1]
+		return pinging_node, random_string, echoing_node
 
 	def respond_to_messages(self, verbose=False):
 		messages_to_send = []

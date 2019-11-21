@@ -43,6 +43,8 @@
 
         NOW:
 
+            do distance calculations of echoes
+
             display stuff
 
                 make it so when you click on a node
@@ -58,9 +60,6 @@
                     determine speed of light in km/s
                         if signal blasted past R in one time step would that fuck up anything
                     determine signal range of average cellphone in km
-
-            put echo parse and ping parse in fns in node class (or separate file) and call them
-                this is just to have them in one easily modifiable place
 
             would it be possible to transfer x and y to Device instead of Node?
                 check all uses of x and y in main and in Node and in Device and in constants
@@ -454,7 +453,7 @@ class View(object):
         self.draw_selected_device_range()
         if self.model.selected_device != None and self.settings.at['r', 'STATE']:
             self.draw_signals()
-        if self.settings.at['c', 'STATE']: 
+        if self.settings.at['c', 'STATE']:
             self.draw_in_range_connections()
         if self.model.selected_device != None and self.settings.at['d', 'STATE']:
             self.draw_messages()
@@ -534,7 +533,7 @@ class View(object):
                 # if self.settings.at['e1', 'STATE']: only do echo's meant for the sd (if e1 )
                 # if self.settings.at['e0', 'STATE']: draw all its (the sd's) echos
                 if self.settings.at['e1', 'STATE']:
-                    rs = m.m.split('\n')[3] # rs = random string
+                    _, rs, _ = d.n.parse_echo(m) # rs = random string
                     if rs not in sd.n.pings.keys():
                         continue
 
@@ -662,7 +661,7 @@ class View(object):
             if signal['message_type'] == 'echo': # only draw echo dot to intended receiver_node
                 nd = edge[0] if edge[1] == sd else edge[1] # nd = neighboring device (of selected device)
                 rd = nd if sn == sd.n else sd # rd = receiver device
-                rn_id = signal['message'].m.split('\n')[1].split(' ')[2] # receiver node according to echo message
+                rn_id, _, _ = sd.n.parse_echo(signal['message']) # receiver node according to echo message
                 if rd.n.sk != rn_id: continue
                 if {rd, signal['sender_device']} != _edge: continue # only draw on the edge with both sender and receiver device
             if signal['message_type'] == 'ping':
@@ -762,7 +761,8 @@ class View(object):
             ): continue
 
             if signal['message_type'] == 'echo': # only draw echo dot to intended receiver_node
-                rn_id = signal['message'].m.split('\n')[1].split(' ')[2] # rn_id = receiver node id
+                rn_id, _, _ = sd.n.parse_echo(signal['message']) # rn_id = receiver node id
+
                 if d0 == sd:
                     pass # draw signal for all echos
                 else:
@@ -818,7 +818,7 @@ class View(object):
                     a1 = theta1 + theta2
                     a2 = theta1 - theta2
                     rect = [_x - _r, _y - _r, 2*_r, 2*_r]
-                   
+
                     pygame.draw.arc(
                         self.surface,
                         faded_color(
@@ -842,7 +842,7 @@ class View(object):
             r = int(SCREEN_SCALE * signal['dist_traveled'])
             if r > SIGNAL_RING_THICKNESS:
                 x = int(SCREEN_SCALE * signal['send_pt'][0])
-                y = int(SCREEN_SCALE * signal['send_pt'][1])        
+                y = int(SCREEN_SCALE * signal['send_pt'][1])
                 color = pygame.Color(color)
                 pygame.draw.circle(
                     self.surface,
@@ -988,7 +988,7 @@ class Model(object):
 
     # create devices that move around the map
     def init_moving_devices(self, verbose=False):
-        
+
         ''' create devices,
 
             there are a variable number of nodes on the map at any given time
@@ -1060,7 +1060,7 @@ class Model(object):
                 intersect = sub_net & d0_and_neighbors
                 if len(intersect) > 0:
                     sub_nets_to_add_to[i] = sub_net
-            
+
             # if d0_and_neighbors intersected exactly 1 sub_net,
             # add them to that sub_net
             if len(sub_nets_to_add_to) == 1:
