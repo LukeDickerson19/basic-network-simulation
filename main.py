@@ -45,11 +45,6 @@
 
             display stuff
 
-                update display to include ALL commands
-                    space - pause/play node movement
-                    s - pause/play signals
-                    etc.
-
                 make it so when you click on a node
                     information appears about
                         its neighbors' public keys, their estimated distance, and their actual distance
@@ -392,10 +387,6 @@ def update_console(caller=''):
 
     # gui settings
     df = view.settings
-    df2 = pd.DataFrame({
-
-    })
-    df.append(df2)
     df = df.assign(STATE=lambda df : df.STATE.replace([True, False], ['ON', 'OFF'])) # convert True/False to ON/OFF
     df_title = '\nGUI Settings:\n'
     gui_settings = df_title + df.to_string() + '\n'
@@ -446,6 +437,8 @@ class View(object):
         self.show_controls = False # toggle control display
 
         init_settings = [
+            ('space', 'pause movement', model.pause_devices),
+            ('s', 'pause signals', model.pause_signals),
             ('n',  'device number', True),
             ('c',  'connections',  True),
             ('d',  'message dots', True),
@@ -1208,10 +1201,11 @@ class Controller(object):
         elif event.key == pygame.K_SPACE: # toggle pause/play of movement of devices
             if verbose: print('space bar')
             self.model.pause_devices = not self.model.pause_devices
+            self.update_view_settings('space')
 
         elif event.key == pygame.K_s: # toggle pause/play of signals in actual simulation
             self.model.pause_signals = not self.model.pause_signals
-            if verbose: print('model.pause_signals = %s' % model.pause_signals)
+            self.update_view_settings('s')
 
         elif event.key == pygame.K_d: self.update_view_settings('r') # toggle draw message dots
         elif event.key == pygame.K_r: self.update_view_settings('r') # toggle draw signal rings
