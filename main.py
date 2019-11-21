@@ -45,6 +45,11 @@
 
             display stuff
 
+                update display to include ALL commands
+                    space - pause/play node movement
+                    s - pause/play signals
+                    etc.
+
                 make it so when you click on a node
                     information appears about
                         its neighbors' public keys, their estimated distance, and their actual distance
@@ -58,6 +63,9 @@
                     determine speed of light in km/s
                         if signal blasted past R in one time step would that fuck up anything
                     determine signal range of average cellphone in km
+                    determine range of average cell tower:
+                        45 miles
+                        https://www.google.com/search?q=cell+tower+range&oq=cell+tower+range&aqs=chrome..69i57j0l5.3071j0j7&sourceid=chrome&ie=UTF-8
 
             put echo parse and ping parse in fns in node class (or separate file) and call them
                 this is just to have them in one easily modifiable place
@@ -376,6 +384,10 @@ def update_console(caller=''):
 
     # gui settings
     df = view.settings
+    df2 = pd.DataFrame({
+
+    })
+    df.append(df2)
     df = df.assign(STATE=lambda df : df.STATE.replace([True, False], ['ON', 'OFF'])) # convert True/False to ON/OFF
     df_title = '\nGUI Settings:\n'
     gui_settings = df_title + df.to_string() + '\n'

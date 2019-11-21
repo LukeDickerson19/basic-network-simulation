@@ -31,7 +31,7 @@ MAX_VEL = AVG_VEL + 3*STD_DEV_VEL # max device velocity
 MIN_VEL = AVG_VEL - 3*STD_DEV_VEL # min device velocity
 MIN_VEL = max(MIN_VEL, 0.00001) # ensure MIN_VEL is always positive
 MAX_DST_DIST = 0.01 # max distance from device to destination that qualifies as reaching the destination
-R = 5.0 # signal radius range of a device to connect to other devices (to send/receive messages)
+R = 7.0 # signal radius range of a device to connect to other devices (to send/receive messages)
 SCREEN_SCALE = 35.0 # pixels per unit, aka make the SCREENSIZE SCREEN_SCALE times as big as coordinate range of the 2D map
 SCREEN_SIZE = (
     int(SCREEN_SCALE * W),
