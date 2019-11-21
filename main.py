@@ -53,9 +53,6 @@
                         test this on home computer
                         ... it seems to work on work computer
 
-                make it so you can click a button (x) and start the simulation over
-                    reset t also
-
                 i need some way to take other nodes off a nodes neighbors list
                 if they dont return a ping, they're taken off
 
@@ -395,6 +392,7 @@ def update_console(caller=''):
     # gui settings
     df = view.settings
     df = df.assign(STATE=lambda df : df.STATE.replace([True, False], ['ON', 'OFF'])) # convert True/False to ON/OFF
+    df.at['x', 'STATE'] = ''
     df_title = '\nSIMULATION SETTINGS:\n'
     gui_settings = df_title + df.to_string() + '\n'
 
@@ -472,8 +470,9 @@ class View(object):
         self.show_controls = False # toggle control display
 
         init_settings = [
+            ('x',  'restart simulation', False),
             ('space', 'pause movement', model.pause_devices),
-            ('s', 'pause signals', model.pause_signals),
+            ('s',  'pause signals', model.pause_signals),
             ('n',  'device number', True),
             ('c',  'connections',  True),
             ('d',  'message dots', True),
@@ -487,9 +486,9 @@ class View(object):
             ('m1', 'messages of direct neighbors of selected device', False)
         ]
         self.settings = pd.DataFrame({
-            'KEY'   : list(map(lambda x : x[0], init_settings)),
-            'DRAW'  : list(map(lambda x : x[1], init_settings)),
-            'STATE' : list(map(lambda x : x[2], init_settings))
+            'KEY'         : list(map(lambda x : x[0], init_settings)),
+            'DESCRIPTION' : list(map(lambda x : x[1], init_settings)),
+            'STATE'       : list(map(lambda x : x[2], init_settings))
         }).set_index('KEY')
 
 
@@ -917,6 +916,7 @@ class Model(object):
 
         t = time.time()
         self.t1 = t # t1 = time of previous time step (1 time step in the past)
+        self.dt = 0 # t - self.t1
 
         # controller variables
         self.selected_device = None  # device user clicked on
@@ -1351,6 +1351,12 @@ if __name__ == '__main__':
             if event.type == QUIT: # Xing out of window
                 pygame.quit()
                 sys.exit()
+
+            elif event.type == KEYDOWN and event.key == pygame.K_x: # restart simulation
+                model = Model()
+                view = View(model)
+                controller = Controller(model, view)
+                # update_console(caller='restart simulation')
             else:
                 controller.handle_event(event, verbose=False)
 
