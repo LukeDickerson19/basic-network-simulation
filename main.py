@@ -45,6 +45,24 @@
 
             display stuff
 
+
+                the the block_printer fucks up when the text has more lines than the console can display
+                    depending one however zoomed in the console text is
+                    it would be awesome if this could be accounted for                
+
+                percieved neighbors needs to be updated automatically
+                    also, it might just be because its not auto-updated,
+                    but why is it taking so long for a node to perceive all its neighbors?
+                        it should take just one ping and subsequent echo to notice it
+
+                i need some way to take other nodes off a nodes neighbors list
+                if they dont return a ping, they're taken off
+
+                t needs to be paused to when movement and signals a both simulaniously paused
+
+                make it so you can click a button (r) and start the simulation over
+                    reset t also
+
                 make it so when you click on a node
                     information appears about
                         its neighbors' public keys, their estimated distance, and their actual distance
@@ -85,6 +103,9 @@
                     might need to create child class for node 1st to display all possible messages
 
                 verify message display is working properly
+
+                set up basic pk sk thing and fix display to support it
+                    sha256
 
         EVENTUALLY:
 
@@ -380,24 +401,53 @@ fps = 0 # frames per second
 # print block to the console
 def update_console(caller=''):
     caller = caller+'\n' if False else '' # display/mute caller output
+    # return
 
     # simulation metrics
-    sim_mtrcs = '\nSimulation Metrics:\n'
+    sim_mtrcs = '\nSIMULATION METRICS:\n'
     sim_mtrcs += 'fps = %d\n' % fps
 
     # gui settings
     df = view.settings
     df = df.assign(STATE=lambda df : df.STATE.replace([True, False], ['ON', 'OFF'])) # convert True/False to ON/OFF
-    df_title = '\nGUI Settings:\n'
+    df_title = '\nSIMULATION SETTINGS:\n'
     gui_settings = df_title + df.to_string() + '\n'
 
     # selected device info
     sd = model.selected_device
-    selected_device_info = '\nSelected Device:\n'
-    selected_device_info += sd.basic_info() if sd != None else 'None\n'
+    selected_device_info = '\nSELECTED DEVICE:\n'
+    if sd != None:
+
+        selected_device_info += \
+            '      Device No.:      %d\n' % sd.num + \
+            '      Node Public Key: %s\n' % sd.n.sk
+
+        pn = sd.n.neighbors # perceived neighbors (according to selected device)
+        num_pn = pn.shape[0]
+        an = model.connections[sd] # an = actual neighbors (according to simulation)
+        an = pd.DataFrame({
+            'Public Key'  : list(map(lambda d : d.n.sk, an.keys())),
+            'Actual Dist' : list(an.values()),
+            'Device No.'  : list(map(lambda d : d.num, an.keys()))
+        })
+        num_an = an.shape[0]
+        selected_device_info += '%d Perceived Neighbor%s and %d Actual Neighbor%s:\n' % (
+            num_pn, '' if num_pn == 1 else 's',
+            num_an, '' if num_an == 1 else 's')
+        both = pn.merge(an, how='outer')
+        both['Error Dist'] = both['Estimated Dist'] - both['Actual Dist']
+        both.sort_values('Estimated Dist', inplace=True, na_position='last')
+        both.fillna('', inplace=True)
+        both.reset_index(inplace=True, drop=True)
+        both.index += 1
+        both = both[['Public Key',  'Device No.', 'Estimated Dist', 'Actual Dist', 'Error Dist']]
+        selected_device_info += both.to_string() + '\n'
+
+    else:
+        selected_device_info += 'None\n'
 
     # network info
-    network_info = '\nNetwork Info:\n'
+    network_info = '\nNETWORK INFO:\n'
     network_info += '%d Devices in the Network\n' % len(model.devices)
     num_sub_nets = len(model.sub_networks)
     network_info += '%d Sub-Network%s:\n' % (num_sub_nets, '' if num_sub_nets == 1 else 's')
@@ -897,7 +947,8 @@ class Model(object):
         # if verbose: print('%s\nt = %s' % ('-'*180, t))
 
         # update devices, connections, and edges, and sub-networks
-        self.get_network_state(self.devices)
+        if not self.pause_devices:
+            self.get_network_state(self.devices)
 
         # move message signals forward,
         # deliver message if it's reached a node,
@@ -940,7 +991,10 @@ class Model(object):
                 # every node sends out a ping signal on a timed interval
                 # and responds to any messages it has received immediately
                 # n.print_n(i=i+1, num_nodes=len(devices), newline_start=True)
-                sent_messages = d.main_loop(verbose=False)#d==self.selected_device)
+                sent_messages, updt_cnsl_dsply = \
+                    d.main_loop(verbose=False)#d==self.selected_device)
+                if d == self.selected_device and updt_cnsl_dsply:
+                    update_console(caller='selected device perceived neighbor update')
                 for message in sent_messages:
 
                     if message.m.startswith('PING'):   message_type = 'ping'
@@ -1059,7 +1113,7 @@ class Model(object):
         self.edges = edges
 
         # find all sub_networks
-        # useful source for set operations
+        # useful source for set operations:
         # https://dev.to/svinci/intersection-union-and-difference-of-sets-in-python-4gkn
         while unvisited_devices != set():
 
@@ -1101,7 +1155,7 @@ class Model(object):
         # update networks in console output if it changed
         sub_networks.sort()
         if sub_networks != self.sub_networks:
-            self.sub_networks = sub_networks
+            self.sub_networks = sub_networks # this must be set before we call update_console
             update_console(caller='update sub-networks')
         else: self.sub_networks = sub_networks
 
@@ -1252,8 +1306,7 @@ class Controller(object):
         update_console(caller='update view state')
         if verbose: print('%s = %s' % (key, self.view.settings.loc[key]['STATE']))
 
-    # click unselected device to select it,
-    # click selected device again to deselect it
+    # click a device to select/deselect it
     def select_or_deselect_device(self, mx, my, verbose=False):
         x, y = mx / SCREEN_SCALE, my / SCREEN_SCALE # mx and my are scaled to display, not the model
         selected_device = self.find_closest_device(x, y, verbose=False)

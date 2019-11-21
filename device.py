@@ -44,9 +44,10 @@ class Device(object):
 
 	def main_loop(self, verbose=False):
 
-		self.sent_messages = self.n.main_loop(verbose=verbose)
+		self.sent_messages, update_console_display = \
+			self.n.main_loop(verbose=verbose)
 
-		return self.sent_messages
+		return self.sent_messages, update_console_display
 
 	def set_source_and_destination(self, devices):
 
@@ -141,16 +142,4 @@ class Device(object):
 
 		self.n.print_n(num_nodes=num_devices, i=i, start_space=start_space, newline_start=newline_start)
 
-	def basic_info(self):
-		dn = self.n.neighbors
-		num_dn = len(dn.keys())
-		direct_neighbors_info = \
-			'%d Direct Neighbor%s:\n%s\n' % (
-				num_dn,
-				'' if num_dn == 1 else 's', # plural or singular
-				dn.to_string() if num_dn > 0 else '')
-		return \
-			'Device Number:   %d\n' % self.num  + \
-			'Node Public Key: %s\n' % self.n.pk + \
-			'Node Secret Key: %s\n' % self.n.sk + \
-			direct_neighbors_info
+

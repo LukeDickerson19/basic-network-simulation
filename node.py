@@ -54,8 +54,8 @@ class Node(object):
 
 			'''
 		self.neighbors = pd.DataFrame({
-			'public_key'     : [],
-			'estimated_dist' : []
+			'Public Key'     : [],
+			'Estimated Dist' : []
 		}) # other nodes get on this list by returning a ping
 		self.potential_neighbors = {
 
@@ -75,15 +75,34 @@ class Node(object):
 		# ping on PING_FREQUENCY
 		ping = None
 		if 1.0 / (t - self.prev_ping_t) <= PING_FREQUENCY:
-			ping = self.ping(verbose=verbose)
+			ping = self.ping(verbose=False)#verbose)
 			self.pings = self.update_ping_list(ping, t)
 			self.prev_ping_t = t
-			if verbose: print('hi %s' % time.ctime(t))
-			if verbose: print('%d messages' % len(self.mailbox))
-		messages_to_send = self.respond_to_messages(verbose=verbose)
+		messages_to_send, update_console_display = \
+			self.respond_to_messages(verbose=verbose)
 		if ping != None:
 			messages_to_send += [ping]
-		return messages_to_send
+		return messages_to_send, update_console_display
+
+	def respond_to_messages(self, verbose=False):
+		messages_to_send = []
+		unread_messages  = []
+		update_console_display = False
+		for i, (message, t) in enumerate(self.mailbox):
+
+			if message.m.startswith('PING'):
+				messages_to_send.append(
+					self.echo(message, verbose=verbose))
+
+			elif message.m.startswith('ECHO'):
+				update_console_display |= \
+					self.process_echo(message, t, verbose=verbose) # |= is OR EQUALS
+
+			else:
+				unread_messages.append(message)
+
+		self.mailbox = unread_messages
+		return messages_to_send, update_console_display
 
 	def update_ping_list(self, p, t):
 
@@ -158,7 +177,7 @@ class Node(object):
 		random_string = e.m.split('\n')[3]
 		echoing_node  = e.m.split('\n')[-1].split(' ')[1]
 		return pinging_node, random_string, echoing_node
-	def process_echo(self, e, t):
+	def process_echo(self, e, t, verbose=False):
 
 		# if yes:
 		#	add them to your list of neighbors
@@ -168,39 +187,23 @@ class Node(object):
 		#	if they dont return a ping, they're taken off
 
 		pn, rs, en = self.parse_echo(e)
+
 		try:
 			# check if the random string returned
 			# is in the list of random strings you
 			# sent out in the near past
 			pt = self.pings[rs]
+
 			ed = ((t - pt) / 2.0) * SIGNAL_SPEED # ed = estimated distance
-			self.neighbors.append(pd.DataFrame({
-				'public_key'     : en,
-				'estimated_dist' : ed
-			}))
+			if not self.neighbors['Public Key'].isin([en]).any():
+				self.neighbors = self.neighbors.append(pd.DataFrame({
+					'Public Key'     : [en],
+					'Estimated Dist' : [ed]
+				}))
+				return True
+			return False
 		except:
-			pass
-
-	def respond_to_messages(self, verbose=False):
-		messages_to_send = []
-		unread_messages  = []
-		for i, (message, t) in enumerate(self.mailbox):
-			if message.m.startswith('PING'):
-				if verbose:
-					print(time.ctime())
-					print('message %d out of %d messages in mailbox' % (i+1, len(self.mailbox)))
-					print('THEIR')
-					print(message.m)
-				messages_to_send.append(self.echo(message, verbose=verbose))
-
-			elif message.m.startswith('ECHO'):
-				self.process_echo(message, t)
-
-			else: # default of switch (why doesn't python have switches?)
-				unread_messages.append(message)
-
-		self.mailbox = unread_messages
-		return messages_to_send
+			return False
 
 	def send_message(self, m, rpk=None):
 		# t   = time of sending this message (int)

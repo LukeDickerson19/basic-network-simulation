@@ -14,7 +14,7 @@ class BlockPrinter:
 
     def print(self, text, end='\n'):
 
-        # Clear previous text by overwriting non-spaces with spaces
+        # clear previous text by overwriting non-spaces with spaces
         self.clear()
 
         # Print new text
@@ -25,15 +25,92 @@ class BlockPrinter:
             lambda line : len(line), text.split('\n')
         ))
 
-# # TEST
+# TEST
 
-# bp = BlockPrinter()
+def test():
 
-# bp.print('Foobar\nBazbar')
-# time.sleep(3)
+    bp = BlockPrinter()
+    SLEEP_TIME = 0.5 # seconds
 
-# bp.print('Foo\nBar')
-# time.sleep(3)
+    # new text has shorter lines
+    bp.print('aaaa')
+    time.sleep(SLEEP_TIME)
+    bp.print('bbb')
+    time.sleep(SLEEP_TIME)
+    bp.print('cc')
+    time.sleep(SLEEP_TIME)
+    bp.print('d')
+    time.sleep(SLEEP_TIME)
+    bp.print('')
+    time.sleep(SLEEP_TIME)
 
-# bp.print('Ayyyyyy')
+    # new text has longer lines
+    bp.print('a')
+    time.sleep(SLEEP_TIME)
+    bp.print('bb')
+    time.sleep(SLEEP_TIME)
+    bp.print('ccc')
+    time.sleep(SLEEP_TIME)
+    bp.print('dddd')
+    time.sleep(SLEEP_TIME)
+    bp.print('')
+    time.sleep(SLEEP_TIME)
+
+    # new text has more lines
+    bp.print('a')
+    time.sleep(SLEEP_TIME)
+    bp.print('b\nb')
+    time.sleep(SLEEP_TIME)
+    bp.print('c\nc\nc')
+    time.sleep(SLEEP_TIME)
+    bp.print('d\nd\nd\nd')
+    time.sleep(SLEEP_TIME)
+    bp.print('')
+    time.sleep(SLEEP_TIME)
+
+    # new text has less lines
+    bp.print('a\na\na\na')
+    time.sleep(SLEEP_TIME)
+    bp.print('b\nb\nb')
+    time.sleep(SLEEP_TIME)
+    bp.print('c\nc')
+    time.sleep(SLEEP_TIME)
+    bp.print('d')
+    time.sleep(SLEEP_TIME)
+    bp.print('')
+    time.sleep(SLEEP_TIME)
+
+    # multiple new lines
+    bp.print('a\na')
+    time.sleep(SLEEP_TIME)
+    bp.print('a\n\na')
+    time.sleep(SLEEP_TIME)
+    bp.print('a\n\n\na')
+    time.sleep(SLEEP_TIME)
+    bp.print('a\n\n\n\na')
+    time.sleep(SLEEP_TIME)
+    bp.print('\na\n\n\na')
+    time.sleep(SLEEP_TIME)
+    bp.print('\n\na\n\na')
+    time.sleep(SLEEP_TIME)
+    bp.print('\n\n\na\na')
+    time.sleep(SLEEP_TIME)
+    bp.print('\n\na\n\na')
+    time.sleep(SLEEP_TIME)
+    bp.print('\na\n\n\na')
+    time.sleep(SLEEP_TIME)
+    bp.print('a\n\n\n\na')
+    time.sleep(SLEEP_TIME)
+    bp.print('a\n\n\na')
+    time.sleep(SLEEP_TIME)
+    bp.print('a\n\na')
+    time.sleep(SLEEP_TIME)
+    bp.print('a\na')
+    time.sleep(SLEEP_TIME)
+    bp.print('')
+    time.sleep(SLEEP_TIME)
+
+
+# test()
+
 
