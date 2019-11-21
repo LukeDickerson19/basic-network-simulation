@@ -19,6 +19,7 @@ class Node(object):
 		self.pk = '' # pk = public key
 
 		# messages this node has received
+		# [(message1, time_received_message1), (message2, time_received_message2), ...]
 		self.mailbox = []
 
 		''' Graph of nodes this node is connected to.
@@ -157,28 +158,43 @@ class Node(object):
 		random_string = e.m.split('\n')[3]
 		echoing_node  = e.m.split('\n')[-1].split(' ')[1]
 		return pinging_node, random_string, echoing_node
+	def process_echo(self, e, t):
+
+		# if yes:
+		#	add them to your list of neighbors
+		#	estimate their distance
+
+		#	i need some way to take nodes off the list
+		#	if they dont return a ping, they're taken off
+
+		pn, rs, en = self.parse_echo(e)
+		try:
+			# check if the random string returned
+			# is in the list of random strings you
+			# sent out in the near past
+			pt = self.pings[rs]
+			ed = ((t - pt) / 2.0) * SIGNAL_SPEED # ed = estimated distance
+			self.neighbors.append(pd.DataFrame({
+				'public_key'     : en,
+				'estimated_dist' : ed
+			}))
+		except:
+			pass
 
 	def respond_to_messages(self, verbose=False):
 		messages_to_send = []
 		unread_messages  = []
-		for i, message in enumerate(self.mailbox):
+		for i, (message, t) in enumerate(self.mailbox):
 			if message.m.startswith('PING'):
 				if verbose:
 					print(time.ctime())
-					print('message %d out of %d messages in mailbox' % (i, len(self.mailbox)))
+					print('message %d out of %d messages in mailbox' % (i+1, len(self.mailbox)))
 					print('THEIR')
 					print(message.m)
 				messages_to_send.append(self.echo(message, verbose=verbose))
 
 			elif message.m.startswith('ECHO'):
-				pass
-				# check if the random string returned is in the list of random strings you sent out in the near past
-				# if yes:
-					# add them to your list of neighbors
-					# estimate their distance
-
-					# i need some way to take nodes off the list
-					# if they dont return a ping, they're taken off
+				self.process_echo(message, t)
 
 			else: # default of switch (why doesn't python have switches?)
 				unread_messages.append(message)

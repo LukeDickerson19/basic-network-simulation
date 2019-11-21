@@ -43,14 +43,26 @@
 
         NOW:
 
-            do distance calculations of echoes
-
             display stuff
 
                 make it so when you click on a node
                     information appears about
                         its neighbors' public keys, their estimated distance, and their actual distance
-                            put it all in a pandas dataframe
+
+                    ... for some reason its not updating the terminal display when the number of neighbors
+                    ... for the selected devices changes
+                    ... its also saying sd.n.neighbors is an empty pd dataframe when it shouldn't be empty
+
+                        don't forget, the neighbors field in the console dispay is its ACTUAL neighbors,
+                            not the neighbors the sd thinks it has, the
+                        maybe make a list of actual neighbors and actual dist,
+                        and then make a separate list of believed neighbors
+
+                        1st figure out how to update it the moment it changes
+                        then figure out how to display the proper number of ACTUAL neighbors
+                        then figure out how to display the actual distance from those neighbors
+                        then figure out how to display the df of the believed neighbors
+                        then check to see how accurate the estimated distance is
 
                 increase signal speed a lot
                 increase ping period a little bit
@@ -60,10 +72,6 @@
                     determine speed of light in km/s
                         if signal blasted past R in one time step would that fuck up anything
                     determine signal range of average cellphone in km
-
-            would it be possible to transfer x and y to Device instead of Node?
-                check all uses of x and y in main and in Node and in Device and in constants
-                    don't do this because the Node's might want to use x, y in their social dynamics
 
             controls stuff
 
@@ -904,11 +912,12 @@ class Model(object):
                 for d in self.devices:
                     if d != sd:
 
-                        # put the signal's message in device d's mailbox if the signal just passed d
+                        # if the signal just passed d, put the signal's message
+                        # and the current time in device d's mailbox
                         dist_sp_to_d = math.sqrt((d.n.x - x)**2 + (d.n.y - y)**2)
                         if prev_signal_dist <= dist_sp_to_d <= signal['dist_traveled'] \
                         and d not in signal['receiver_devices']:
-                            d.n.mailbox.append(signal['message'])
+                            d.n.mailbox.append((signal['message'], t))
                             signal['receiver_devices'].add(d)
 
                 # remove message that have reached the max signal range
