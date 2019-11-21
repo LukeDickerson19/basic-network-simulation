@@ -62,7 +62,8 @@
                         then figure out how to display the proper number of ACTUAL neighbors
                         then figure out how to display the actual distance from those neighbors
                         then figure out how to display the df of the believed neighbors
-                        then check to see how accurate the estimated distance is
+                        then check to see how accurate the estimated distance is from the real distance
+                            especially after you change the variables below!
 
                 increase signal speed a lot
                 increase ping period a little bit
