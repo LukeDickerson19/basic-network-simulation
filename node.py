@@ -56,7 +56,7 @@ class Node(object):
 		self.neighbors = pd.DataFrame({
 			'Public Key'     : [],
 			'Estimated Dist' : []
-		}) # other nodes get on this list by returning a ping
+		}) # other nodes get on this list by returning a ping, other nodes get taken off this list by not returning a ping
 		self.potential_neighbors = {
 
 		} # other nodes get on this list by sending this node a ping

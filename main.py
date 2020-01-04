@@ -44,23 +44,13 @@
         NOW:
 
             display stuff
+    
+                i need some way to take other nodes off a node's neighbors list
+                    if they dont return a ping, they're taken off
 
+                it needs to be paused to when movement and signals a both simulaniously paused
 
-                the the block_printer fucks up when the text has more lines than the console can display
-                    depending one however zoomed in the console text is
-                    it would be awesome if this could be accounted for                
-
-                percieved neighbors needs to be updated automatically
-                    also, it might just be because its not auto-updated,
-                    but why is it taking so long for a node to perceive all its neighbors?
-                        it should take just one ping and subsequent echo to notice it
-
-                i need some way to take other nodes off a nodes neighbors list
-                if they dont return a ping, they're taken off
-
-                t needs to be paused to when movement and signals a both simulaniously paused
-
-                make it so you can click a button (r) and start the simulation over
+                make it so you can click a button (a) and start the simulation over
                     reset t also
 
                 make it so when you click on a node
@@ -89,7 +79,7 @@
                 increase R a little bit
                     determine average walking speed of person in km/s
                     determine speed of light in km/s
-                        if signal blasted past R in one time step would that fuck up anything
+                        if signal blasted past R in one time step would that fuck up anything?
                     determine signal range of average cellphone in km
                     determine range of average cell tower:
                         45 miles
@@ -99,6 +89,7 @@
 
                 make it so you can send a message manually from one node to another
                 and you can select from a list of all possible messages a node can make in the terminal
+                    make it so one of the options is to send a text message that is typed manually
 
                     might need to create child class for node 1st to display all possible messages
 
@@ -108,6 +99,10 @@
                     sha256
 
         EVENTUALLY:
+
+            the the block_printer fucks up when the text has more lines than the console can display
+                depending on however zoomed in the console text is
+                it would be awesome if this could be accounted for
 
             maybe pygame clock is better than time.time()
                 clock = pygame.time.Clock()
@@ -583,16 +578,18 @@ class View(object):
             _p, _e, _m = self.settings.at['p1', 'STATE'], self.settings.at['e1', 'STATE'], self.settings.at['m1', 'STATE']
         p, e, m = False, False, False
         for m in sent_messages:
-            if _m:
+            is_ping = m.m.startswith('PING')
+            is_echo = m.m.startswith('ECHO')
+            if _m and (not is_ping) and (not is_echo):
                 m = True
                 d.message_dist = 0
                 d.most_recent_message_type = 'message'
-            elif _p and m.m.startswith('PING'):
+            elif _p and is_ping:
                 p = True
                 d.ping_dist = 0
-                if ((not _m) or (d.message_dist != 0)):
+                if (not _m) or (d.message_dist != 0):
                     d.most_recent_message_type = 'ping'
-            elif _e and m.m.startswith('ECHO'):
+            elif _e and is_echo:
 
                 # if self.settings.at['e1', 'STATE']: only do echo's meant for the sd (if e1 )
                 # if self.settings.at['e0', 'STATE']: draw all its (the sd's) echos
@@ -697,13 +694,13 @@ class View(object):
             if not (
                 (
                     d0 == sd and (
-                        (self.settings.at['m0', 'STATE']) or
+                        (self.settings.at['m0', 'STATE'] and signal['message_type'] == 'message') or
                         (self.settings.at['p0', 'STATE'] and signal['message_type'] == 'ping') or
                         (self.settings.at['e0', 'STATE'] and signal['message_type'] == 'echo')
                     )
                 ) or (
                     d0 in self.model.connections[sd] and (
-                        (self.settings.at['m1', 'STATE']) or
+                        (self.settings.at['m1', 'STATE'] and signal['message_type'] == 'message') or
                         (self.settings.at['p1', 'STATE'] and signal['message_type'] == 'ping') or
                         (self.settings.at['e1', 'STATE'] and signal['message_type'] == 'echo')
                     )
@@ -811,13 +808,13 @@ class View(object):
             if not (
                 (
                     d0 == sd and (
-                        (self.settings.at['m0', 'STATE']) or
+                        (self.settings.at['m0', 'STATE'] and signal['message_type'] == 'message') or
                         (self.settings.at['p0', 'STATE'] and signal['message_type'] == 'ping') or
                         (self.settings.at['e0', 'STATE'] and signal['message_type'] == 'echo')
                     )
                 ) or (
                     d0 in self.model.connections[sd] and (
-                        (self.settings.at['m1', 'STATE']) or
+                        (self.settings.at['m1', 'STATE'] and signal['message_type'] == 'message') or
                         (self.settings.at['p1', 'STATE'] and signal['message_type'] == 'ping') or
                         (self.settings.at['e1', 'STATE'] and signal['message_type'] == 'echo')
                     )
@@ -927,7 +924,14 @@ class Model(object):
         self.connections, self.edges, self.sub_networks = None, None, None
 
         # list of signals that are being broadcast. Used to simulate signal time delay in simulation
-        # format: [{'sender_device':<Device>, 'dist_traveled':<float>, 'send_pt':<(float, float)>, 'message':<str>}, ...]
+        ''' format: [{
+                'sender_device':<Device>,
+                'dist_traveled':<float>,
+                'send_pt':<(float, float)>,
+                'message':<str>,
+                'message_type':<str>},
+                ...]
+            '''
         self.signals = []
 
         t = time.time()
@@ -1345,7 +1349,6 @@ if __name__ == '__main__':
     model = Model()
     view = View(model)
     controller = Controller(model, view)
-
 
     # frame rate variables
     start_time = time.time()
