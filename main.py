@@ -78,6 +78,9 @@
                 decrease device speed a lot
                 increase R a little bit
                     determine average walking speed of person in km/s
+                        1.4 meters per second
+                            https://en.wikipedia.org/wiki/Walking
+                                Ctrl f + "1.4 meters per second"
                     determine speed of light in km/s
                         if signal blasted past R in one time step would that fuck up anything?
                     determine signal range of average cellphone in km
@@ -86,6 +89,11 @@
                         https://www.google.com/search?q=cell+tower+range&oq=cell+tower+range&aqs=chrome..69i57j0l5.3071j0j7&sourceid=chrome&ie=UTF-8
 
             controls stuff
+
+                the error distance between the node's predicted distance and the simulation's
+                actual distance could be decreased by tracking time with number of time steps
+                in the simulation instead of the the actual time (discretized by unix-time integers)
+
 
                 make it so you can send a message manually from one node to another
                 and you can select from a list of all possible messages a node can make in the terminal
@@ -381,6 +389,7 @@ import sys
 import math
 import random
 import pandas as pd
+pd.set_option('display.width', 10)
 from pygame.locals import QUIT, KEYDOWN
 from constants import *
 from node import Node
@@ -482,19 +491,20 @@ class View(object):
         self.show_controls = False # toggle control display
 
         init_settings = [
-            ('space', 'pause movement', model.pause_devices),
-            ('s', 'pause signals', model.pause_signals),
-            ('n',  'device number', True),
-            ('c',  'connections',  True),
-            ('d',  'message dots', True),
-            ('r',  'signal rings', True),
-            ('f',  'node signal flash', True),
-            ('p0', 'pings of selected device', True),
-            ('e0', 'echos of selected device', False),
-            ('m0', 'messages of selected device', False),
-            ('p1', 'pings of direct neighbors of selected device', False),
-            ('e1', 'echos of direct neighbors of selected device', True),
-            ('m1', 'messages of direct neighbors of selected device', False)
+            ('space', 'pause movement ....................................', model.pause_devices),
+            ('x',     'reset simulation ..................................', False),
+            ('s',     'pause signals .....................................', model.pause_signals),
+            ('n',     'device number .....................................', True),
+            ('c',     'connections .......................................', True),
+            ('d',     'message dots ......................................', True),
+            ('r',     'signal rings ......................................', True),
+            ('f',     'node signal flash .................................', True),
+            ('p0',    'pings of selected device ..........................', True),
+            ('e0',    'echos of selected device ..........................', False),
+            ('m0',    'messages of selected device .......................', False),
+            ('p1',    'pings of direct neighbors of selected device ......', False),
+            ('e1',    'echos of direct neighbors of selected device ......', True),
+            ('m1',    'messages of direct neighbors of selected device ...', False)
         ]
         self.settings = pd.DataFrame({
             'KEY'   : list(map(lambda x : x[0], init_settings)),
@@ -916,6 +926,9 @@ class Model(object):
 
     def __init__(self):
 
+        self.boot()
+    def boot(self):
+
         # create devices, connections and edges
         # devices: [Device(), Device(), ...]
         # connections: {keys=devices : value={key=neighbor_device, value=distance}}
@@ -1264,6 +1277,9 @@ class Controller(object):
         elif event.key == pygame.K_s: # toggle pause/play of signals in actual simulation
             self.model.pause_signals = not self.model.pause_signals
             self.update_view_settings('s')
+
+        elif event.key == pygame.K_x: # reset simulation
+            self.model.boot()
 
         elif event.key == pygame.K_d: self.update_view_settings('r') # toggle draw message dots
         elif event.key == pygame.K_r: self.update_view_settings('r') # toggle draw signal rings
