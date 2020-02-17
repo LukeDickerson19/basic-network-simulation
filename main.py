@@ -48,30 +48,32 @@
                 i need some way to take other nodes off a node's neighbors list
                     if they dont return a ping, they're taken off
 
+<<<<<<< HEAD
                 it needs to be paused to when movement and signals a both simulaniously paused
 
                 make it so you can click a button (a) and start the simulation over
                     reset t also
+=======
+                percieved neighbors needs to be updated automatically
+                    also, it might just be because its not auto-updated,
+                    but why is it taking so long for a node to perceive all its neighbors?
+                        it should take just one ping and subsequent echo to notice it
 
-                make it so when you click on a node
-                    information appears about
-                        its neighbors' public keys, their estimated distance, and their actual distance
+                        test this on home computer
+                        ... it seems to work on work computer
 
-                    ... for some reason its not updating the terminal display when the number of neighbors
-                    ... for the selected devices changes
-                    ... its also saying sd.n.neighbors is an empty pd dataframe when it shouldn't be empty
+                i need some way to take other nodes off a nodes neighbors list
+                if they dont return a ping, they're taken off
 
-                        don't forget, the neighbors field in the console dispay is its ACTUAL neighbors,
-                            not the neighbors the sd thinks it has, the
-                        maybe make a list of actual neighbors and actual dist,
-                        and then make a separate list of believed neighbors
+                    also need to make sure the estimated distance is updated each echo it receives
+                    and make sure it doesn't have duplicatess
+>>>>>>> e54ddd0bdd3a8c2e02e89b1fe089b72c377bd9a2
 
-                        1st figure out how to update it the moment it changes
-                        then figure out how to display the proper number of ACTUAL neighbors
-                        then figure out how to display the actual distance from those neighbors
-                        then figure out how to display the df of the believed neighbors
-                        then check to see how accurate the estimated distance is from the real distance
-                            especially after you change the variables below!
+                t needs to be paused too when movement and signals a both simulaniously paused
+
+                the the block_printer fucks up when the text has more lines than the console can display
+                    depending one however zoomed in the console text is
+                    it would be awesome if this could be accounted for
 
                 increase signal speed a lot
                 increase ping period a little bit
@@ -414,6 +416,7 @@ def update_console(caller=''):
     # gui settings
     df = view.settings
     df = df.assign(STATE=lambda df : df.STATE.replace([True, False], ['ON', 'OFF'])) # convert True/False to ON/OFF
+    df.at['x', 'STATE'] = ''
     df_title = '\nSIMULATION SETTINGS:\n'
     gui_settings = df_title + df.to_string() + '\n'
 
@@ -491,6 +494,7 @@ class View(object):
         self.show_controls = False # toggle control display
 
         init_settings = [
+<<<<<<< HEAD
             ('space', 'pause movement ....................................', model.pause_devices),
             ('x',     'reset simulation ..................................', False),
             ('s',     'pause signals .....................................', model.pause_signals),
@@ -505,11 +509,27 @@ class View(object):
             ('p1',    'pings of direct neighbors of selected device ......', False),
             ('e1',    'echos of direct neighbors of selected device ......', True),
             ('m1',    'messages of direct neighbors of selected device ...', False)
+=======
+            ('x',  'restart simulation', False),
+            ('space', 'pause movement', model.pause_devices),
+            ('s',  'pause signals', model.pause_signals),
+            ('n',  'device number', True),
+            ('c',  'connections',  True),
+            ('d',  'message dots', True),
+            ('r',  'signal rings', True),
+            ('f',  'node signal flash', True),
+            ('p0', 'pings of selected device', True),
+            ('e0', 'echos of selected device', False),
+            ('m0', 'messages of selected device', False),
+            ('p1', 'pings of direct neighbors of selected device', False),
+            ('e1', 'echos of direct neighbors of selected device', True),
+            ('m1', 'messages of direct neighbors of selected device', False)
+>>>>>>> e54ddd0bdd3a8c2e02e89b1fe089b72c377bd9a2
         ]
         self.settings = pd.DataFrame({
-            'KEY'   : list(map(lambda x : x[0], init_settings)),
-            'DRAW'  : list(map(lambda x : x[1], init_settings)),
-            'STATE' : list(map(lambda x : x[2], init_settings))
+            'KEY'         : list(map(lambda x : x[0], init_settings)),
+            'DESCRIPTION' : list(map(lambda x : x[1], init_settings)),
+            'STATE'       : list(map(lambda x : x[2], init_settings))
         }).set_index('KEY')
 
 
@@ -949,6 +969,7 @@ class Model(object):
 
         t = time.time()
         self.t1 = t # t1 = time of previous time step (1 time step in the past)
+        self.dt = 0 # t - self.t1
 
         # controller variables
         self.selected_device = None  # device user clicked on
@@ -1385,6 +1406,12 @@ if __name__ == '__main__':
             if event.type == QUIT: # Xing out of window
                 pygame.quit()
                 sys.exit()
+
+            elif event.type == KEYDOWN and event.key == pygame.K_x: # restart simulation
+                model = Model()
+                view = View(model)
+                controller = Controller(model, view)
+                # update_console(caller='restart simulation')
             else:
                 controller.handle_event(event, verbose=False)
 
