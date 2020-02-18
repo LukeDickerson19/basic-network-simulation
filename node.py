@@ -93,9 +93,9 @@ class Node(object):
 			# if the amount of time it would take for a neighboring device to respond to our ping
 			# at the very edge of our signal range R, has surpassed the max round trip duration
 			# since our previous ping
-			self.prev_ping_t
+			whuuut = self.prev_ping_t
 			max_possible_ping_time = (2 * R) / SIGNAL_SPEED
-			if ? > max_possible_ping_time:
+			if whuuut > max_possible_ping_time:
 
 				# remove them from the list of neighbors
 				pass

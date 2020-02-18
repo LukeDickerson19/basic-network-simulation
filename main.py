@@ -61,7 +61,7 @@ def update_console(caller=''):
         error_label = ' Est. Error'
         both[error_label] = (both['Estimated Dist'] - both['Actual Dist']) / both['Actual Dist']
         both[error_label] = both[error_label].apply(lambda dist : '%.2f%%' % (100 * dist))
-        both.sort_values('Estimated Dist', inplace=True, na_position='last')
+        both.sort_values('Actual Dist', inplace=True, na_position='last')
         both.fillna('', inplace=True)
         both.reset_index(inplace=True, drop=True)
         both.index += 1
