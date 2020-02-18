@@ -9,7 +9,7 @@ import pandas as pd
 
 class Node(object):
 
-	def __init__(self, x, y, grid=True):
+	def __init__(self, x, y, t, grid=True):
 
 		# coordinates of this node
 		self.x = x
@@ -56,7 +56,7 @@ class Node(object):
 		self.neighbors = pd.DataFrame({
 			'Public Key'     : [],
 			'Estimated Dist' : []
-		}) # other nodes get on this list by returning a ping, other nodes get taken off this list by not returning a ping
+		}).set_index('Public Key') # other nodes get on this list by returning a ping, other nodes get taken off this list by not returning a ping
 		self.potential_neighbors = {
 
 		} # other nodes get on this list by sending this node a ping
@@ -65,40 +65,62 @@ class Node(object):
 		# key   = ping random string
 		# value = time ping was sent
 		self.pings = {}
-		self.prev_ping_t = time.time() - (1 / PING_FREQUENCY)*random.uniform(0, 1) # start pings at random times in period
+		if TIME_OR_ITERATION_BASED:
+			self.prev_ping_t = t - (1 / PING_FREQUENCY)*random.uniform(0, 1)  # start pings at random times in period (to desyncronize the nodes' pings)
+		else:
+			self.prev_ping_t = -1 - random.randint(0, 1 / PING_FREQUENCY) # -1 to avoid ZeroDivisionError
 
-
-	def main_loop(self, verbose=False):
-		t = time.time() # unix time, example: 1424233311.771502
+	def main_loop(self, t, verbose=False):
 		# if verbose: print('\nNode %s:' % self.sk)
 
+		messages_to_send = []
+
 		# ping on PING_FREQUENCY
-		ping = None
 		if 1.0 / (t - self.prev_ping_t) <= PING_FREQUENCY:
-			ping = self.ping(verbose=False)#verbose)
+			ping = self.ping(verbose=False)
 			self.pings = self.update_ping_list(ping, t)
 			self.prev_ping_t = t
-		messages_to_send, update_console_display = \
+			messages_to_send.append(ping)
+
+		# respond to any messages received
+		more_messages_to_send, update_console_display = \
 			self.respond_to_messages(verbose=verbose)
-		if ping != None:
-			messages_to_send += [ping]
+		messages_to_send += more_messages_to_send
+
+		# remove nodes from neighbors list if they haven't responded to our previous ping in time
+		for neighbor in self.neighbors.iterrows():
+
+			# if the amount of time it would take for a neighboring device to respond to our ping
+			# at the very edge of our signal range R, has surpassed the max round trip duration
+			# since our previous ping
+			self.prev_ping_t
+			max_possible_ping_time = (2 * R) / SIGNAL_SPEED
+			if ? > max_possible_ping_time:
+
+				# remove them from the list of neighbors
+				pass
+
 		return messages_to_send, update_console_display
 
 	def respond_to_messages(self, verbose=False):
 		messages_to_send = []
 		unread_messages  = []
 		update_console_display = False
-		for i, (message, t) in enumerate(self.mailbox):
+		for j, (message, t) in enumerate(self.mailbox):
 
 			if message.m.startswith('PING'):
 				messages_to_send.append(
-					self.echo(message, verbose=verbose))
+					self.echo(message))#, verbose=verbose))
 
 			elif message.m.startswith('ECHO'):
 				update_console_display |= \
 					self.process_echo(message, t, verbose=verbose) # |= is OR EQUALS
 
 			else:
+
+				############# insert response to blue messages here #############
+				#################################################################
+
 				unread_messages.append(message)
 
 		self.mailbox = unread_messages
@@ -115,7 +137,8 @@ class Node(object):
 		for rs, pt in self.pings.items():
 			# rs = random string
 			# pt = ping time
-			time_since_ping = time.time() - pt
+
+			time_since_ping = t - pt
 			max_time_since_ping = (2.0 * R) / SIGNAL_SPEED
 			if time_since_ping < max_time_since_ping:
 				pings[rs] = pt
@@ -179,31 +202,27 @@ class Node(object):
 		return pinging_node, random_string, echoing_node
 	def process_echo(self, e, t, verbose=False):
 
-		# if yes:
-		#	add them to your list of neighbors
-		#	estimate their distance
-
-		#	i need some way to take nodes off the list
-		#	if they dont return a ping, they're taken off
-
+		# pn = ping node      <string>
+		# rs = random string  <string>
+		# en = echoing node   <string>
 		pn, rs, en = self.parse_echo(e)
 
+		# check if the random string returned is in the list
+		# of random strings you sent out in the near past
 		try:
-			# check if the random string returned
-			# is in the list of random strings you
-			# sent out in the near past
 			pt = self.pings[rs]
-
-			ed = ((t - pt) / 2.0) * SIGNAL_SPEED # ed = estimated distance
-			if not self.neighbors['Public Key'].isin([en]).any():
-				self.neighbors = self.neighbors.append(pd.DataFrame({
-					'Public Key'     : [en],
-					'Estimated Dist' : [ed]
-				}))
-				return True
-			return False
 		except:
 			return False
+
+		# update the Estimated Distance of the echoing node
+		ed = ((t - pt) / 2.0) * SIGNAL_SPEED # ed = estimated distance
+		if en in self.neighbors.index: # update an existing neighbor's estimated dist
+			self.neighbors.at[en, 'Estimated Dist'] = ed
+			return True		
+		else: # else it wasn't in the list b/c its a new neighbor, so append it's estimated dist
+			self.neighbors.loc[en] = [ed]
+			return True
+		return False
 
 	def send_message(self, m, rpk=None):
 		# t   = time of sending this message (int)

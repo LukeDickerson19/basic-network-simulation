@@ -1,3 +1,4 @@
+import time
 import math
 import string
 import pygame
@@ -40,14 +41,18 @@ SCREEN_SIZE = (
 
 
 
-SIGNAL_SPEED = 4.5 # how far the signal travels per second (make sure this is faster than MAX_VEL)
-PING_FREQUENCY = 0.5 #0.33 # number of pings per second
+TIME_OR_ITERATION_BASED = True # True for time based, False for iteration based
+SIGNAL_SPEED = 4.5 if TIME_OR_ITERATION_BASED else 0.09 # how far the signal travels per second (make sure this is faster than MAX_VEL)
+PING_FREQUENCY = 0.5 if TIME_OR_ITERATION_BASED else 0.01 # number of pings per second
+def current_time():
+    # return pygame.time.Clock()
+    return time.time() # unix time, example: 1424233311.771502
 
 # Python Color Constants Module
 # https://python-forum.io/Thread-PyGame-PyGame-Colors
-_ping = ('red', (255, 0, 0))
-_echo = ('green', (0, 255, 0))
-_message = ('blue', (0, 0, 255))
+_ping    = ('red',   (255, 0, 0))
+_echo    = ('green', (0, 255, 0))
+_message = ('blue',  (0, 0, 255))
 BACKGROUND_COLOR = ('black', (0, 0, 0))
 DEVICE_DEFAULT_COLOR = ('white', (255, 255, 255))
 DEVICE_PING_COLOR = _ping

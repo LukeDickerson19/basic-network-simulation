@@ -1,387 +1,3 @@
-
-
-''' NOTES:
-
-    DESCRIPTION:
-
-    USAGE:
-
-
-        toggle seeing:
-            edges between nodes - w/ "c"
-            selected device's:
-                pings    - w/ "p0 *enter*"
-                echos    - w/ "e0 *enter*"
-                messages - w/ "m0 *enter*"
-            devices' in range of selected device:
-                pings    - w/ "p1 *enter*"
-                echos    - w/ "e1 *enter*"
-                messages - w/ "m1 *enter*"
-            signal rings        - w/ "r"
-            message dots        - w/ "d"
-
-    SOURCES:
-
-        https://www.pygame.org/docs/
-
-        PyGame color Codes
-        https://www.webucator.com/blog/2015/03/python-color-constants-module/
-
-    OTHER:
-
-    IDEAS:
-
-        if the first neighpbor can verify the sender is who they say they are, they can pass on that verification, and then verify they're who THEY say they are, and the 2nd neighbor can verify the same, ... and a path can be built
-
-        what if you used the position triangluation to verify that someone isn't using a server farm to run a bunch of nodes
-        in order for nodes to count they need to be spread out (and moving frequenty? what about desktops) to exibit normal device behavior
-
-        can current router hardware communicate directly with each other, if they're in range?
-            probably not, we need something that extends MILES, not the area of a house
-
-    TO DO:
-
-        NOW:
-
-            display stuff
-    
-                i need some way to take other nodes off a node's neighbors list
-                    if they dont return a ping, they're taken off
-
-<<<<<<< HEAD
-                it needs to be paused to when movement and signals a both simulaniously paused
-
-                make it so you can click a button (a) and start the simulation over
-                    reset t also
-=======
-                percieved neighbors needs to be updated automatically
-                    also, it might just be because its not auto-updated,
-                    but why is it taking so long for a node to perceive all its neighbors?
-                        it should take just one ping and subsequent echo to notice it
-
-                        test this on home computer
-                        ... it seems to work on work computer
-
-                i need some way to take other nodes off a nodes neighbors list
-                if they dont return a ping, they're taken off
-
-                    also need to make sure the estimated distance is updated each echo it receives
-                    and make sure it doesn't have duplicatess
->>>>>>> e54ddd0bdd3a8c2e02e89b1fe089b72c377bd9a2
-
-                t needs to be paused too when movement and signals a both simulaniously paused
-
-                the the block_printer fucks up when the text has more lines than the console can display
-                    depending one however zoomed in the console text is
-                    it would be awesome if this could be accounted for
-
-                increase signal speed a lot
-                increase ping period a little bit
-                decrease device speed a lot
-                increase R a little bit
-                    determine average walking speed of person in km/s
-                        1.4 meters per second
-                            https://en.wikipedia.org/wiki/Walking
-                                Ctrl f + "1.4 meters per second"
-                    determine speed of light in km/s
-                        if signal blasted past R in one time step would that fuck up anything?
-                    determine signal range of average cellphone in km
-                    determine range of average cell tower:
-                        45 miles
-                        https://www.google.com/search?q=cell+tower+range&oq=cell+tower+range&aqs=chrome..69i57j0l5.3071j0j7&sourceid=chrome&ie=UTF-8
-
-            controls stuff
-
-                the error distance between the node's predicted distance and the simulation's
-                actual distance could be decreased by tracking time with number of time steps
-                in the simulation instead of the the actual time (discretized by unix-time integers)
-
-
-                make it so you can send a message manually from one node to another
-                and you can select from a list of all possible messages a node can make in the terminal
-                    make it so one of the options is to send a text message that is typed manually
-
-                    might need to create child class for node 1st to display all possible messages
-
-                verify message display is working properly
-
-                set up basic pk sk thing and fix display to support it
-                    sha256
-
-        EVENTUALLY:
-
-            the the block_printer fucks up when the text has more lines than the console can display
-                depending on however zoomed in the console text is
-                it would be awesome if this could be accounted for
-
-            maybe pygame clock is better than time.time()
-                clock = pygame.time.Clock()
-
-            make simulation faster by:
-
-                model could probably be made faster if we didn't copy over so much data
-                    its done to avoid messing up the iteration by deleting during an iteration though
-                        if we could find a way to delete without messing up the iteration,
-                            for lists we could iterate by index and then decrement the index when we delete
-                            what about dictionaries though?
-                                aren't dictionary keys a set in python?
-                                    does deleting from a set mess up iterating over it?
-
-                    searching through the code for places where we don't have to copy over data
-                    could be done simultaniously while we are searching for places to thread
-
-                model could be faster if we did more stuff in parallel using
-
-                    async lib
-                        https://realpython.com/async-io-python/
-
-                        Efficient Parallel Graph Algorithms in Python
-                        https://pdfs.semanticscholar.org/54b9/22a51e5aa04e7512720348c2deda33e2e4ee.pdf
-
-                    or just use basic threading
-                        see threading_example1.py
-
-                        once you thread it:
-                            in the console output
-                            change fps global variable to
-                                model.fps
-                                view.fps
-                                controller.fps
-
-            make static map and cellular automata maps
-                figure out how to get a fully connected network that is distributed evenly
-                over the entire area ... more or less
-
-                #################### these model functions to be fixed #############################
-
-                    # create devices that are stationary in the map
-                    def init_static_devices(self, verbose=False):
-                        pass
-
-                    # return boolean flagging if ALL the devices form 1 fully connected network
-                    def fully_connected_network(self, devices, connections):
-                        for d, c in connections.items():
-                            if len(c) == 0:
-                                return False
-                        return True
-
-                    # return a list of node networks
-                    def get_networks(self, devices, connections, verbose=False):
-
-                        def get_network_recurrsively(d0, connections, network):
-                            network += [n0]
-                            for c in connections[d0]: # self.get_direct_neighbors(n0, unvisited_nodes):
-                                nd = c.keys[0] # nd = neighboring device
-                                if nd not in network:
-                                    network = get_network_recurrsively(d, connections, network)
-                            return network
-
-                        networks = []
-                        devices = list(filter(lambda d : isinstance(d, Device), devices)) # for cellular automata
-                        unvisited_devices = copy.deepcopy(devices)
-                        while len(unvisited_devices) > 0:
-                            d0 = unvisited_devices[0]
-                            network = get_network_recurrsively(d0, connections, [])
-                            networks.append(network)
-                            for d in network:
-                                unvisited_devices.remove(d)
-
-                        if verbose:
-                            print('\n%d Networks:' % len(networks))
-                            for i, network in enumerate(networks):
-                                print('\nNetwork %d has %d device(s)' % (i+1, len(network)))
-                                for d in network:
-                                    d.print_d()
-
-                        return networks
-
-                    # network 0: N nodes constantly throughout all time steps for the entire simulation
-                    def create_random_network(self, verbose=False):
-
-                        # self.nodes = [Node()]
-                        # while len(self.nodes) < N:
-                        #     n = Node()
-                        #     self.nodes.append(n)
-                        #     if len(self.get_direct_neighbors(n).keys()) == 0:
-                        #         self.nodes.remove(n)
-                        # return self.nodes
-
-                        # self.nodes = [Node() for _ in range(N)]
-                        # while not self.fully_connected_network():
-                        #     print('Fail')
-                        #     self.nodes = [Node() for _ in range(N)]
-                        # if verbose:
-                        #     print('Created network0 of %d nodes' % N)
-                        # return self.nodes
-
-                        nodes = [Node() for _ in range(N)]
-                        connections = self.get_network_state(nodes)
-                        networks = self.get_networks(nodes, verbose=verbose)
-                        return nodes, connections
-
-                    # cellular automata
-                    def create_grid_network(self, verbose=False):
-                        # create grid with one node at the center
-                        # nodes = np.array([[Node(x, y) for x in range(W)] for y in range(H)]).flatten().tolist()
-                        nodes = []
-                        for x in range(W):
-                            grid_col = []
-                            for y in range(H):
-                                grid_col.append(
-                                    Node(x, y) if (x, y) in AUTOMATA_START_POSITIONS['one_center'] else str(x)+','+str(y))
-                            nodes += grid_col
-                        if verbose:
-                            for y in range(H):
-                                s = ''
-                                for x in range(W):
-                                    s += ('N' if isinstance(nodes[x*H+y], Node) else '*') + ' '
-                                print(s)
-
-                        connections = self.get_network_state(nodes)
-                        # networks = self.get_networks(nodes, verbose=verbose)
-                        return nodes, connections
-                    def evolve_grid(self, verbose=False):
-
-                        def evolve_cell(x0, y0, nodes):
-
-                            # get grid neighbors state
-                            # print('Finding Neighbours (x0, y0) = (%d, %d)' % (x0, y0))
-                            neighbours = []
-                            for x in range(x0-1, x0+2):
-                                for y in range(y0-1, y0+2):
-
-                                    # no wrap around
-                                    if 0 <= x < W and 0 <= y < H:
-                                        if not (x == x0 and y == y0):
-                                            # print('x = %d y = %d   %s' % (x, y, 'ALIVE' if isinstance(nodes[x*H+y], Node) else 'dead'))
-                                            neighbours.append(nodes[x*H+y])
-
-                                    # # wrap around
-                                    # x = W-1 if x == -1 else x
-                                    # x = 0 if x == W else x
-                                    # y = H-1 if y == -1 else y
-                                    # y = 0 if y == H else y
-                                    # if not (x == x0 and y == y0):
-                                    #     print('x = %d y = %d   %s' % (x, y, 'ALIVE' if isinstance(nodes[x*H+y], Node) else 'dead'))
-                                    #     neighbours.append(nodes[x*H+y])
-
-                            # count neighbouring nodes
-
-                            nn = len(list(filter(lambda n : isinstance(n, Node), neighbours)))
-                            # print('nn = %d' % nn)
-
-                            def conways_game_of_life():
-                                cell0 = nodes[x0*H+y0]
-                                dead = str(x0)+','+str(y0)
-                                print('cell0 at (%d, %d)' % (x0, y0))
-                                if isinstance(cell0, Node):
-                                    print('ALIVE')
-                                    if nn < 2: # Death by isolation
-                                        print('Death by isolation')
-                                        return dead
-                                    elif 1 < nn < 4: # Survival
-                                        print('Survival')
-                                        return cell0
-                                    elif 3 < nn: # Death by overcrowding
-                                        print('Death by overcrowding')
-                                        return dead
-                                else: # cell0 == None
-                                    print('dead')
-                                    if nn == 3: # Births
-                                        print('birth')
-                                        return Node(x0, y0)
-                                    else:
-                                        print('stay dead')
-                                        return dead
-                            def forest_fire():
-                                cell0 = nodes[x0*H+y0]
-                                empty   = str(x0)+','+str(y0)
-                                burning = empty + ' burning'
-                                print('cell0 at (%d, %d)' % (x0, y0))
-                                if isinstance(cell0, Node):
-                                    print('tree')
-                                    if nn < 0: # A tree will burn if at least one neighbor is burning
-                                        print('tree will burn if at least one neighbor is burning')
-                                        return burning
-                                    else:
-                                        # A tree ignites with probability F even if no neighbor is burning
-                                        return cell0 if random.uniform(0, 1) <= F else burning
-                                else: # not a tree
-                                    if cell0.endswith(' burning'): # A burning cell turns into an empty cell
-                                        print('burning')
-                                        return empty
-                                    else: # An empty space fills with a tree with probability p
-                                        print('empty')
-                                        return Node(x0, y0) if random.uniform(0, 1) <= P else cell0
-                            def forest():
-                                cell0 = nodes[x0*H+y0]
-                                empty = str(x0)+','+str(y0)
-                                pn = float(nn/8) # percent neighbors
-                                if isinstance(cell0, Node): # tree
-                                    # the more trees there are around a tree,
-                                    # the more likely the tree will die (become an empty space)
-                                    # a tree will not die if it has no neighbours
-                                    return cell0 if nn == 0 or random.uniform(0, 1) <= 1.00 - pn*percent_trees else empty
-
-                                else: # empty
-                                    # a tree can only grow if there is at least 1 neighbor
-                                    # the less nn there are around an empty space the more likely a tree will grow
-                                    # nn: min=0, max=8
-                                    # probablility: min=0, max=100
-                                    # if few  neighbors: high likelyhood
-                                    # if many neighbors: low  likelyhood 8n 1/9 p
-                                    return Node(x0, y0) if nn > 0 and random.uniform(0, 1) <= 1.00 - pn*percent_trees else empty
-
-                            return forest()
-
-                        # for forest growth
-                        num_trees = len(list(filter(lambda n :     isinstance(n, Node), self.nodes)))
-                        num_empty = len(list(filter(lambda n : not isinstance(n, Node), self.nodes)))
-                        percent_trees = float(num_trees) / num_empty
-
-                        nodes = []
-                        for x in range(W):
-                            for y in range(H):
-                                # print()
-                                nodes.append(evolve_cell(x, y, self.nodes))
-
-                        # ensure we never delete all the nodes
-                        if nodes:
-                            non_empty_nodes = []
-                            for n in self.nodes:
-                                if isinstance(n, Node):
-                                    non_empty_nodes.append(n)
-                        nodes = [non_empty_nodes[random.randint(len(non_empty_nodes))]] if nodes == [] else nodes
-
-                        self.nodes = nodes
-                        self.connections = self.get_network_state(self.nodes)
-
-                        if verbose:
-                            print('Grid Evolution')
-                            for y in range(H):
-                                s = ''
-                                for x in range(W):
-                                    s += ('N' if isinstance(self.nodes[x*H+y], Node) else '*') + ' '
-                                print(s)
-                            print('------------------------------------------------------')
-
-
-                    this was at the end of model.update()
-
-                        # update the Nodes in the network every AUTOMATA_PERIOD
-                        if (t - self.t2) > AUTOMATA_PERIOD:
-                            self.evolve_grid(verbose=False)
-                            self.t2 = t
-
-                ####################################################################################
-
-
-            maybe use this to improve device movement
-            https://github.com/florimondmanca/pyboids
-            where each boid has its own destination
-
-        '''
-
 import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide" # don't display Pygame Intro at start of program
 os.environ['SDL_VIDEO_WINDOW_POS'] = "650,10" # set GUI window start position
@@ -429,7 +45,7 @@ def update_console(caller=''):
             '      Device No.:      %d\n' % sd.num + \
             '      Node Public Key: %s\n' % sd.n.sk
 
-        pn = sd.n.neighbors # perceived neighbors (according to selected device)
+        pn = sd.n.neighbors.reset_index() # perceived neighbors (according to selected device)
         num_pn = pn.shape[0]
         an = model.connections[sd] # an = actual neighbors (according to simulation)
         an = pd.DataFrame({
@@ -442,12 +58,14 @@ def update_console(caller=''):
             num_pn, '' if num_pn == 1 else 's',
             num_an, '' if num_an == 1 else 's')
         both = pn.merge(an, how='outer')
-        both['Error Dist'] = both['Estimated Dist'] - both['Actual Dist']
+        error_label = ' Est. Error'
+        both[error_label] = (both['Estimated Dist'] - both['Actual Dist']) / both['Actual Dist']
+        both[error_label] = both[error_label].apply(lambda dist : '%.2f%%' % (100 * dist))
         both.sort_values('Estimated Dist', inplace=True, na_position='last')
         both.fillna('', inplace=True)
         both.reset_index(inplace=True, drop=True)
         both.index += 1
-        both = both[['Public Key',  'Device No.', 'Estimated Dist', 'Actual Dist', 'Error Dist']]
+        both = both[['Public Key',  'Device No.', 'Actual Dist', 'Estimated Dist', error_label]]
         selected_device_info += both.to_string() + '\n'
 
     else:
@@ -494,7 +112,6 @@ class View(object):
         self.show_controls = False # toggle control display
 
         init_settings = [
-<<<<<<< HEAD
             ('space', 'pause movement ....................................', model.pause_devices),
             ('x',     'reset simulation ..................................', False),
             ('s',     'pause signals .....................................', model.pause_signals),
@@ -509,22 +126,6 @@ class View(object):
             ('p1',    'pings of direct neighbors of selected device ......', False),
             ('e1',    'echos of direct neighbors of selected device ......', True),
             ('m1',    'messages of direct neighbors of selected device ...', False)
-=======
-            ('x',  'restart simulation', False),
-            ('space', 'pause movement', model.pause_devices),
-            ('s',  'pause signals', model.pause_signals),
-            ('n',  'device number', True),
-            ('c',  'connections',  True),
-            ('d',  'message dots', True),
-            ('r',  'signal rings', True),
-            ('f',  'node signal flash', True),
-            ('p0', 'pings of selected device', True),
-            ('e0', 'echos of selected device', False),
-            ('m0', 'messages of selected device', False),
-            ('p1', 'pings of direct neighbors of selected device', False),
-            ('e1', 'echos of direct neighbors of selected device', True),
-            ('m1', 'messages of direct neighbors of selected device', False)
->>>>>>> e54ddd0bdd3a8c2e02e89b1fe089b72c377bd9a2
         ]
         self.settings = pd.DataFrame({
             'KEY'         : list(map(lambda x : x[0], init_settings)),
@@ -949,11 +550,15 @@ class Model(object):
         self.boot()
     def boot(self):
 
+        t = current_time() if TIME_OR_ITERATION_BASED else 0
+        self.pt = t # pt = time of previous time step (1 time step in the past)
+        self.dt = 0 # t - self.pt
+
         # create devices, connections and edges
         # devices: [Device(), Device(), ...]
-        # connections: {keys=devices : value={key=neighbor_device, value=distance}}
+        # connections: {key=devices : value={key=neighbor_device, value=distance}}
         # edges: [{device0, device1}, {device2, device0}, ...]
-        self.devices = self.init_moving_devices(verbose=False)
+        self.devices = self.init_moving_devices(t, verbose=False)
         self.connections, self.edges, self.sub_networks = None, None, None
 
         # list of signals that are being broadcast. Used to simulate signal time delay in simulation
@@ -966,11 +571,7 @@ class Model(object):
                 ...]
             '''
         self.signals = []
-
-        t = time.time()
-        self.t1 = t # t1 = time of previous time step (1 time step in the past)
-        self.dt = 0 # t - self.t1
-
+        
         # controller variables
         self.selected_device = None  # device user clicked on
         self.pause_devices   = False # pause/play movement
@@ -980,9 +581,14 @@ class Model(object):
     # main_loop of the model
     def update(self, verbose=False):
 
-        t = time.time()
-        self.dt = t - self.t1
-        # if verbose: print('%s\nt = %s' % ('-'*180, t))
+        if TIME_OR_ITERATION_BASED:
+            t = current_time()
+            self.dt = t - self.pt
+        else:
+            t = self.pt + 1
+            self.dt = 1
+        
+        # if verbose: print('%s\nt = %s, i = %d' % ('-'*180, t, self.i))
 
         # update devices, connections, and edges, and sub-networks
         if not self.pause_devices:
@@ -1030,7 +636,7 @@ class Model(object):
                 # and responds to any messages it has received immediately
                 # n.print_n(i=i+1, num_nodes=len(devices), newline_start=True)
                 sent_messages, updt_cnsl_dsply = \
-                    d.main_loop(verbose=False)#d==self.selected_device)
+                    d.main_loop(t, verbose=False)#d==self.selected_device)
                 if d == self.selected_device and updt_cnsl_dsply:
                     update_console(caller='selected device perceived neighbor update')
                 for message in sent_messages:
@@ -1090,11 +696,11 @@ class Model(object):
 
             self.devices = devices
 
-        # update t1 at end of update()
-        self.t1 = t
+        # update pt at end of update()
+        self.pt = t
 
     # create devices that move around the map
-    def init_moving_devices(self, verbose=False):
+    def init_moving_devices(self, t, verbose=False):
 
         ''' create devices,
 
@@ -1122,7 +728,7 @@ class Model(object):
         n_to_create = int(((N_MAX - N_MIN) / 2) + N_MIN) # create halfway between N_MIN and N_MAX
         while n_to_create > 0:
             n_to_create -= 1
-            devices.append(Device(devices))
+            devices.append(Device(devices, t))
         if verbose:
             print('Nodes:')
             num_devices = len(devices)
@@ -1383,6 +989,7 @@ if __name__ == '__main__':
 
     # setup
     pygame.init()
+    clock = pygame.time.Clock()
     model = Model()
     view = View(model)
     controller = Controller(model, view)
@@ -1424,3 +1031,5 @@ if __name__ == '__main__':
         pygame.display.update()
 
         # time.sleep(1.0) # control frame rate (in seconds)
+
+

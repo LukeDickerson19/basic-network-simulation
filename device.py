@@ -26,12 +26,12 @@ import numpy as np
 
 class Device(object):
 
-	def __init__(self, devices):
+	def __init__(self, devices, t):
 
 		self.src, self.dst = self.set_source_and_destination(devices)
 		self.vel = self.set_velocity()
 		# print('src = (%.4f, %.4f)' % (self.src[0], self.src[1]))
-		self.n = Node(self.src[0], self.src[1], grid=False)
+		self.n = Node(self.src[0], self.src[1], t, grid=False)
 		self.num = self.set_num(devices) # unique int from all the other devices
 
 
@@ -42,10 +42,10 @@ class Device(object):
 		self.most_recent_message_type = None
 
 
-	def main_loop(self, verbose=False):
+	def main_loop(self, t, verbose=False):
 
 		self.sent_messages, update_console_display = \
-			self.n.main_loop(verbose=verbose)
+			self.n.main_loop(t, verbose=verbose)
 
 		return self.sent_messages, update_console_display
 
@@ -60,7 +60,7 @@ class Device(object):
 		while src == None:
 			if src_side == 'left':   src = (0, H * random.uniform(0, 1))
 			if src_side == 'right':  src = (W, H * random.uniform(0, 1))
-			if src_side == 'top':	src = (W * random.uniform(0, 1), H)
+			if src_side == 'top':	 src = (W * random.uniform(0, 1), H)
 			if src_side == 'bottom': src = (W * random.uniform(0, 1), 0)
 			for d in devices:
 				if d.n.x == src[0] and d.n.y == src[1]:
@@ -70,7 +70,7 @@ class Device(object):
 		# pick the opposite side for the dst
 		if src_side == 'left':   dst_side = 'right'
 		if src_side == 'right':  dst_side = 'left'
-		if src_side == 'top':	dst_side = 'bottom'
+		if src_side == 'top':	 dst_side = 'bottom'
 		if src_side == 'bottom': dst_side = 'top'
 		# # pick a random other side
 		# sides.remove(src_side)
@@ -79,7 +79,7 @@ class Device(object):
 		# pick a random point on that side and set the dst there
 		if dst_side == 'left':   dst = (0, H * random.uniform(0, 1))
 		if dst_side == 'right':  dst = (W, H * random.uniform(0, 1))
-		if dst_side == 'top':	dst = (W * random.uniform(0, 1), H)
+		if dst_side == 'top':    dst = (W * random.uniform(0, 1), H)
 		if dst_side == 'bottom': dst = (W * random.uniform(0, 1), 0)
 
 		return src, dst
