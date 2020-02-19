@@ -57,16 +57,25 @@ def update_console(caller=''):
         selected_device_info += '%d Perceived Neighbor%s and %d Actual Neighbor%s:\n' % (
             num_pn, '' if num_pn == 1 else 's',
             num_an, '' if num_an == 1 else 's')
-        both = pn.merge(an, how='outer')
-        error_label = ' Est. Error'
-        both[error_label] = (both['Estimated Dist'] - both['Actual Dist']) / both['Actual Dist']
-        both[error_label] = both[error_label].apply(lambda dist : '%.2f%%' % (100 * dist))
-        both.sort_values('Actual Dist', inplace=True, na_position='last')
-        both.fillna('', inplace=True)
-        both.reset_index(inplace=True, drop=True)
-        both.index += 1
-        both = both[['Public Key',  'Device No.', 'Actual Dist', 'Estimated Dist', error_label]]
-        selected_device_info += both.to_string() + '\n'
+        if not (pn.empty and an.empty):
+            if pn.empty:
+                both = an
+                both['Estimated Dist'] = pd.Series([np.nan] * both.shape[0])
+            elif an.empty:
+                both = pn
+                both['Actual Dist'] = pd.Series([np.nan] * both.shape[0])
+                both['Device No.']  = pd.Series([np.nan] * both.shape[0])
+            else:
+                both = pn.merge(an, how='outer')
+            error_label = ' Est. Error'
+            both[error_label] = (both['Estimated Dist'] - both['Actual Dist']) / both['Actual Dist']
+            both[error_label] = both[error_label].apply(lambda dist : '%.2f%%' % (100 * dist))
+            both.sort_values('Actual Dist', inplace=True, na_position='last')
+            both.fillna('', inplace=True)
+            both.reset_index(inplace=True, drop=True)
+            both.index += 1
+            both = both[['Public Key',  'Device No.', 'Actual Dist', 'Estimated Dist', error_label]]
+            selected_device_info += both.to_string() + '\n'
 
     else:
         selected_device_info += 'None\n'
@@ -581,14 +590,20 @@ class Model(object):
     # main_loop of the model
     def update(self, verbose=False):
 
-        if TIME_OR_ITERATION_BASED:
-            t = current_time()
-            self.dt = t - self.pt
+        # if either devices or signals are playing, play t as well
+        # (aka pause t when both devices and signals are paused)
+        if (not self.pause_signals) or (not self.pause_devices):
+            if TIME_OR_ITERATION_BASED:
+                t = current_time()
+                self.dt = t - self.pt
+            else:
+                t = self.pt + 1
+                self.dt = 1
         else:
-            t = self.pt + 1
-            self.dt = 1
+            t = self.pt
+            self.dt = 0
         
-        # if verbose: print('%s\nt = %s, i = %d' % ('-'*180, t, self.i))
+        # if verbose: print('%s\nt = %s' % ('-'*180, t))
 
         # update devices, connections, and edges, and sub-networks
         if not self.pause_devices:
@@ -636,7 +651,7 @@ class Model(object):
                 # and responds to any messages it has received immediately
                 # n.print_n(i=i+1, num_nodes=len(devices), newline_start=True)
                 sent_messages, updt_cnsl_dsply = \
-                    d.main_loop(t, verbose=False)#d==self.selected_device)
+                    d.main_loop(t, verbose=d==self.selected_device)
                 if d == self.selected_device and updt_cnsl_dsply:
                     update_console(caller='selected device perceived neighbor update')
                 for message in sent_messages:
@@ -692,7 +707,7 @@ class Model(object):
                     # print('num_devices_to_add = %d' % num_devices_to_add)
                 while num_devices_to_add > 0:
                     num_devices_to_add -= 1
-                    devices.append(Device(devices))
+                    devices.append(Device(devices, t))
 
             self.devices = devices
 

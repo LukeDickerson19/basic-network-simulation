@@ -54,17 +54,16 @@ class Node(object):
 
 			'''
 		self.neighbors = pd.DataFrame({
-			'Public Key'     : [],
-			'Estimated Dist' : []
+			'Public Key'            : [],
+			'Estimated Dist'        : [],
+			'Most Recent Echo Time' : []
 		}).set_index('Public Key') # other nodes get on this list by returning a ping, other nodes get taken off this list by not returning a ping
 		self.potential_neighbors = {
 
 		} # other nodes get on this list by sending this node a ping
 
 		# map of pings to the time they were sent out
-		# key   = ping random string
-		# value = time ping was sent
-		self.pings = {}
+		self.pings = {} # {key = ping random string, value = time ping was sent}
 		if TIME_OR_ITERATION_BASED:
 			self.prev_ping_t = t - (1 / PING_FREQUENCY)*random.uniform(0, 1)  # start pings at random times in period (to desyncronize the nodes' pings)
 		else:
@@ -77,6 +76,12 @@ class Node(object):
 
 		# ping on PING_FREQUENCY
 		if 1.0 / (t - self.prev_ping_t) <= PING_FREQUENCY:
+
+			# remove nodes from neighbors list if they haven't responded to our previous ping in time
+			# (if this isn't done on PING_FREQUENCY, the simulation fps is WAY slower)
+			self.neighbors = self.neighbors[t - self.neighbors['Most Recent Echo Time'] <= MAX_POSSIBLE_PING_TIME]
+
+			# then send the next ping
 			ping = self.ping(verbose=False)
 			self.pings = self.update_ping_list(ping, t)
 			self.prev_ping_t = t
@@ -86,19 +91,6 @@ class Node(object):
 		more_messages_to_send, update_console_display = \
 			self.respond_to_messages(verbose=verbose)
 		messages_to_send += more_messages_to_send
-
-		# remove nodes from neighbors list if they haven't responded to our previous ping in time
-		for neighbor in self.neighbors.iterrows():
-
-			# if the amount of time it would take for a neighboring device to respond to our ping
-			# at the very edge of our signal range R, has surpassed the max round trip duration
-			# since our previous ping
-			whuuut = self.prev_ping_t
-			max_possible_ping_time = (2 * R) / SIGNAL_SPEED
-			if whuuut > max_possible_ping_time:
-
-				# remove them from the list of neighbors
-				pass
 
 		return messages_to_send, update_console_display
 
@@ -212,17 +204,13 @@ class Node(object):
 		try:
 			pt = self.pings[rs]
 		except:
-			return False
+			return False # return False to not update the console output display b/c this is an echo to a ping someone else sent
 
 		# update the Estimated Distance of the echoing node
 		ed = ((t - pt) / 2.0) * SIGNAL_SPEED # ed = estimated distance
-		if en in self.neighbors.index: # update an existing neighbor's estimated dist
-			self.neighbors.at[en, 'Estimated Dist'] = ed
-			return True		
-		else: # else it wasn't in the list b/c its a new neighbor, so append it's estimated dist
-			self.neighbors.loc[en] = [ed]
-			return True
-		return False
+		self.neighbors.loc[en] = [ed, t] # add new neighbor, or update existing neighbor
+
+		return True # return True to update the console output display
 
 	def send_message(self, m, rpk=None):
 		# t   = time of sending this message (int)
