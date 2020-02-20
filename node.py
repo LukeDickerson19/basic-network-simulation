@@ -75,17 +75,16 @@ class Node(object):
 		messages_to_send = []
 
 		# ping on PING_FREQUENCY
-		if 1.0 / (t - self.prev_ping_t) <= PING_FREQUENCY:
+		if PING_PERIODICALLY:
+			if 1.0 / (t - self.prev_ping_t) <= PING_FREQUENCY:
 
-			# remove nodes from neighbors list if they haven't responded to our previous ping in time
-			# (if this isn't done on PING_FREQUENCY, the simulation fps is WAY slower)
-			self.neighbors = self.neighbors[t - self.neighbors['Most Recent Echo Time'] <= MAX_POSSIBLE_PING_TIME]
+				# remove nodes from neighbors list if they haven't responded to our previous ping in time
+				# (if this isn't done on PING_FREQUENCY, the simulation fps is WAY slower)
+				self.neighbors = self.neighbors[t - self.neighbors['Most Recent Echo Time'] <= MAX_POSSIBLE_PING_TIME]
 
-			# then send the next ping
-			ping = self.ping(verbose=False)
-			self.pings = self.update_ping_list(ping, t)
-			self.prev_ping_t = t
-			messages_to_send.append(ping)
+				# then send the next ping
+				ping = self.ping(t, verbose=False)
+				messages_to_send.append(ping)
 
 		# respond to any messages received
 		more_messages_to_send, update_console_display = \
@@ -113,16 +112,14 @@ class Node(object):
 				############# insert response to blue messages here #############
 				#################################################################
 
-				unread_messages.append(message)
+				# unread_messages.append((message, t))
+				# messages_to_send.append(message) # causes message cycles D-:
+				pass
 
 		self.mailbox = unread_messages
 		return messages_to_send, update_console_display
 
 	def update_ping_list(self, p, t):
-
-		# save most recent ping
-		rs, _ = self.parse_ping(p)
-		self.pings[rs] = t
 
 		# trim old pings that are out of range R
 		pings = {}
@@ -131,9 +128,12 @@ class Node(object):
 			# pt = ping time
 
 			time_since_ping = t - pt
-			max_time_since_ping = (2.0 * R) / SIGNAL_SPEED
-			if time_since_ping < max_time_since_ping:
+			if time_since_ping < MAX_POSSIBLE_PING_TIME:
 				pings[rs] = pt
+
+		# save most recent ping
+		rs, _ = self.parse_ping(p)
+		pings[rs] = t
 
 		return pings
 
@@ -141,7 +141,7 @@ class Node(object):
 		return ''.join(
 			random.choice(ALL_CHARS) for i in range(string_length))
 
-	def ping(self, verbose=False):
+	def ping(self, t, verbose=False):
 		random_string = self.create_random_string()
 		m = '\n'.join([
 			'PING',
@@ -166,7 +166,11 @@ class Node(object):
 		if verbose:
 			print(time.ctime())
 			print(m)
-		return self.send_message(m)
+
+		ping = self.send_message(m)
+		self.pings = self.update_ping_list(ping, t)
+		self.prev_ping_t = t
+		return ping
 	def parse_ping(self, p):
 		random_string = p.m.split('\n')[3]
 		sender_node   = p.m.split('\n')[-1].split(' ')[1]

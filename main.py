@@ -77,6 +77,10 @@ def update_console(caller=''):
             both = both[['Public Key',  'Device No.', 'Actual Dist', 'Estimated Dist', error_label]]
             selected_device_info += both.to_string() + '\n'
 
+        # message options
+        selected_device_info += 'Press 1 to send ping message\n'
+        selected_device_info += 'Press 2 to send custom message\n'
+
     else:
         selected_device_info += 'None\n'
 
@@ -131,10 +135,10 @@ class View(object):
             ('f',     'node signal flash .................................', True),
             ('p0',    'pings of selected device ..........................', True),
             ('e0',    'echos of selected device ..........................', False),
-            ('m0',    'messages of selected device .......................', False),
+            ('m0',    'messages of selected device .......................', True),
             ('p1',    'pings of direct neighbors of selected device ......', False),
             ('e1',    'echos of direct neighbors of selected device ......', True),
-            ('m1',    'messages of direct neighbors of selected device ...', False)
+            ('m1',    'messages of direct neighbors of selected device ...', True)
         ]
         self.settings = pd.DataFrame({
             'KEY'         : list(map(lambda x : x[0], init_settings)),
@@ -655,19 +659,7 @@ class Model(object):
                 if d == self.selected_device and updt_cnsl_dsply:
                     update_console(caller='selected device perceived neighbor update')
                 for message in sent_messages:
-
-                    if message.m.startswith('PING'):   message_type = 'ping'
-                    elif message.m.startswith('ECHO'): message_type = 'echo'
-                    else:                              message_type = 'message'
-
-                    self.signals.append({
-                        'sender_device'    : d,
-                        'dist_traveled'    : 0.00,
-                        'send_pt'          : (d.n.x, d.n.y),
-                        'message'          : message,
-                        'message_type'     : message_type,
-                        'receiver_devices' : set() # ensures that a signal doesn't pass a node twice
-                    })
+                    self.start_signal(d, message)
 
         # move the devices
         if not self.pause_devices:
@@ -713,6 +705,22 @@ class Model(object):
 
         # update pt at end of update()
         self.pt = t
+
+    # puts the message in the list of signals for the simulation to propegate from device d
+    def start_signal(self, sender_device, message):
+
+        if message.m.startswith('PING'):   message_type = 'ping'
+        elif message.m.startswith('ECHO'): message_type = 'echo'
+        else:                              message_type = 'message'
+
+        self.signals.append({
+            'sender_device'    : sender_device,
+            'dist_traveled'    : 0.00,
+            'send_pt'          : (sender_device.n.x, sender_device.n.y),
+            'message'          : message,
+            'message_type'     : message_type,
+            'receiver_devices' : set() # ensures that a signal doesn't pass a node twice
+        })
 
     # create devices that move around the map
     def init_moving_devices(self, t, verbose=False):
@@ -887,6 +895,7 @@ class Controller(object):
         self.view = view
         self.paused = False
         self.buffer = ''
+        self.entering_custom_message = False
 
 
     # respond to any user input
@@ -895,7 +904,7 @@ class Controller(object):
             if event.type == pygame.MOUSEBUTTONDOWN:
 
                 mouse_pos = pygame.mouse.get_pos()
-                mx, my = mouse_pos[0], mouse_pos[1]
+                mx, my = mouse_pos # mx = mouse_pos[0], my = mouse_pos[1]
                 if verbose: print('mouse position = (%d,%d)' % (mx, my))
 
                 if   event.button == 4:
@@ -911,57 +920,79 @@ class Controller(object):
                 else:
                     if verbose: print('event.button = %d' % event.button)
 
-        elif event.key == pygame.K_SPACE: # toggle pause/play of movement of devices
-            if verbose: print('space bar')
-            self.model.pause_devices = not self.model.pause_devices
-            self.update_view_settings('space')
-
-        elif event.key == pygame.K_s: # toggle pause/play of signals in actual simulation
-            self.model.pause_signals = not self.model.pause_signals
-            self.update_view_settings('s')
-
-        elif event.key == pygame.K_x: # reset simulation
-            self.model.boot()
-
-        elif event.key == pygame.K_d: self.update_view_settings('r') # toggle draw message dots
-        elif event.key == pygame.K_r: self.update_view_settings('r') # toggle draw signal rings
-        elif event.key == pygame.K_c: self.update_view_settings('c') # toggle draw connection lines
-        elif event.key == pygame.K_f: self.update_view_settings('f') # toggle draw node flash from signal
-        elif event.key == pygame.K_n: self.update_view_settings('n') # toggle draw device number
-
-        elif event.key == pygame.K_RETURN:
-            if verbose: print('self.buffer = %s' % self.buffer)
-
-            if   self.buffer == 'p0': self.update_view_settings('p0') # toggle drawing pings of selected device
-            elif self.buffer == 'p1': self.update_view_settings('p1') # toggle drawing pings of direct neighbors of selected device
-            elif self.buffer == 'e0': self.update_view_settings('e0') # toggle drawing echos of selected device
-            elif self.buffer == 'e1': self.update_view_settings('e1') # toggle drawing echos of direct neighbors of selected device
-            elif self.buffer == 'm0': self.update_view_settings('m0') # toggle drawing messages of selected device
-            elif self.buffer == 'm1': self.update_view_settings('m1') # toggle drawing messages of direct neighbors of selected device
-
-            else:
-                if verbose: print('unknown buffer: %s' % self.buffer)
-            self.buffer = ''
-
-        elif event.key == pygame.K_UP:
-            if verbose: print('up arrow')
-        elif event.key == pygame.K_DOWN:
-            if verbose: print('down arrow')
-        elif event.key == pygame.K_LEFT:
-            if verbose: print('left arrow')
-        elif event.key == pygame.K_RIGHT:
-            if verbose: print('right arrow')
         else:
-            # print(event.key)
-            # print('[%s]' %event.unicode)
-            # print()
-            self.buffer += event.unicode
-            print(self.buffer, end="\r", flush=True)
 
-        # # another way to do it, gets keys currently pressed
-        # keys = pygame.key.get_pressed()  # checking pressed keys
-        # if keys[pygame.K_UP]:
-        #     pass # etc. ...
+            if self.entering_custom_message and event.key != pygame.K_RETURN:
+                self.buffer += event.unicode
+                print(self.buffer, end="\r", flush=True)
+
+            elif event.key == pygame.K_SPACE: # toggle pause/play of movement of devices
+                if verbose: print('space bar')
+                self.model.pause_devices = not self.model.pause_devices
+                self.update_view_settings('space')
+
+            elif event.key == pygame.K_s: # toggle pause/play of signals in actual simulation
+                self.model.pause_signals = not self.model.pause_signals
+                self.update_view_settings('s')
+
+            elif event.key == pygame.K_x: # reset simulation
+                self.model.boot()
+
+            elif event.key == pygame.K_d: self.update_view_settings('r') # toggle draw message dots
+            elif event.key == pygame.K_r: self.update_view_settings('r') # toggle draw signal rings
+            elif event.key == pygame.K_c: self.update_view_settings('c') # toggle draw connection lines
+            elif event.key == pygame.K_f: self.update_view_settings('f') # toggle draw node flash from signal
+            elif event.key == pygame.K_n: self.update_view_settings('n') # toggle draw device number
+
+            elif event.key == pygame.K_1:
+                if self.model.selected_device != None:
+                    t = self.model.pt + self.model.dt
+                    ping = self.model.selected_device.n.ping(t)
+                    self.model.start_signal(self.model.selected_device, ping)
+
+            elif event.key == pygame.K_2:
+                if self.model.selected_device != None:
+                    self.entering_custom_message = True
+
+            elif event.key == pygame.K_RETURN:
+                if verbose: print('self.buffer = %s' % self.buffer)
+
+                if self.entering_custom_message:
+                    self.entering_custom_message = False
+                    message = self.model.selected_device.n.send_message(self.buffer)
+                    self.model.start_signal(self.model.selected_device, message)
+
+                elif self.buffer == 'p0': self.update_view_settings('p0') # toggle drawing pings of selected device
+                elif self.buffer == 'p1': self.update_view_settings('p1') # toggle drawing pings of direct neighbors of selected device
+                elif self.buffer == 'e0': self.update_view_settings('e0') # toggle drawing echos of selected device
+                elif self.buffer == 'e1': self.update_view_settings('e1') # toggle drawing echos of direct neighbors of selected device
+                elif self.buffer == 'm0': self.update_view_settings('m0') # toggle drawing messages of selected device
+                elif self.buffer == 'm1': self.update_view_settings('m1') # toggle drawing messages of direct neighbors of selected device
+
+                else:
+                    if verbose: print('unknown buffer: %s' % self.buffer)
+                self.buffer = ''
+
+            elif event.key == pygame.K_UP:
+                if verbose: print('up arrow')
+            elif event.key == pygame.K_DOWN:
+                if verbose: print('down arrow')
+            elif event.key == pygame.K_LEFT:
+                if verbose: print('left arrow')
+            elif event.key == pygame.K_RIGHT:
+                if verbose: print('right arrow')
+            else:
+                # print(event.key)
+                # print('[%s]' %event.unicode)
+                # print()
+                self.buffer += event.unicode
+                print(self.buffer, end="\r", flush=True)
+
+            # # another way to do it, gets keys currently pressed
+            # keys = pygame.key.get_pressed()  # checking pressed keys
+            # if keys[pygame.K_UP]:
+            #     pass # etc. ...
+
     def update_view_settings(self, key, verbose=False):
         current_state = self.view.settings.loc[key]['STATE']
         self.view.settings.at[key, 'STATE'] = not current_state
