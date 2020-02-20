@@ -76,6 +76,19 @@ TO DO:
             depending on however zoomed in the console text is
             it would be awesome if this could be accounted for
 
+            this can be fixed by
+                expanding the width of the pygame window 
+                putting all the console output on the left side of the pygame window
+                changing the pygame.display.update function to only update part of the display
+                depending on which part we want to update
+                    "display.update() allows to update a portion of the screen"
+                    https://stackoverflow.com/questions/29314987/difference-between-pygame-display-update-and-pygame-display-flip
+
+                this could also make it easier to see what you're typing when you enter a custom message
+                however if we did this you couldn't copy/paste the public key because its not in the terminal anymore ...
+                    perhaps use device number ... this interaction is just for the simulation anyway
+                        or use "pk<device number>" and it parses it to the public key <----- THIS!!!!
+
         maybe pygame clock is better than time.time()
             clock = pygame.time.Clock()
             https://stackoverflow.com/questions/34383559/pygame-clock-tick-vs-framerate-in-game-main-loop
