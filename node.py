@@ -9,11 +9,13 @@ import pandas as pd
 
 class Node(object):
 
-	def __init__(self, x, y, t, grid=True):
+	def __init__(self, x, y, t, ping_periodically, grid=True):
 
 		# coordinates of this node
 		self.x = x
 		self.y = y
+
+		self.ping_periodically = ping_periodically # boolean to flag if we want to ping periodically
 
 		self.sk = self.create_random_string() # sk = secret key
 		self.pk = '' # pk = public key
@@ -22,37 +24,7 @@ class Node(object):
 		# [(message1, time_received_message1), (message2, time_received_message2), ...]
 		self.mailbox = []
 
-		''' Graph of nodes this node is connected to.
-
-			key:   neighbor's public key
-			value: {
-				'known_min_distance'  : 4.556284
-				'claimed_coordinates' : (10.0, 12.5),
-				'neighbors' : { ... repeats ... }
-			}
-
-			Example:
-			self.neighbors = {
-				0 : {
-						'pk0' : {
-							'known_min_distance'  : 4.556284
-							'claimed_coordinates' : (10.0, 12.5),
-							'neighbors' : { ... }
-						},
-						'pk1' : {
-
-						},
-						'pk2' : {
-
-						}
-				},
-				1 : {
-
-				}
-
-			}
-
-			'''
+		# dictionary of nodes that this node is directly connected to
 		self.neighbors = pd.DataFrame({
 			'Public Key'            : [],
 			'Estimated Dist'        : [],
@@ -75,7 +47,7 @@ class Node(object):
 		messages_to_send = []
 
 		# ping on PING_FREQUENCY
-		if PING_PERIODICALLY:
+		if self.ping_periodically:
 			if 1.0 / (t - self.prev_ping_t) <= PING_FREQUENCY:
 
 				# remove nodes from neighbors list if they haven't responded to our previous ping in time

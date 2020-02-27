@@ -23,7 +23,7 @@ fps = 0 # frames per second
 # print block to the console
 def update_console(caller=''):
     caller = caller+'\n' if False else '' # display/mute caller output
-    # return
+    return
 
     # simulation metrics
     sim_mtrcs = '\nSIMULATION METRICS:\n'
@@ -78,8 +78,8 @@ def update_console(caller=''):
             selected_device_info += both.to_string() + '\n'
 
         # message options
-        selected_device_info += 'Press 1 to send ping message\n'
-        selected_device_info += 'Press 2 to send custom message\n'
+        selected_device_info += 'Press 8 to send ping message\n'
+        selected_device_info += 'Press 9 to send custom message\n'
 
     else:
         selected_device_info += 'None\n'
@@ -128,6 +128,7 @@ class View(object):
             ('space', 'pause movement ....................................', model.pause_devices),
             ('x',     'reset simulation ..................................', False),
             ('s',     'pause signals .....................................', model.pause_signals),
+            ('a',     'ping ping_periodically ............................', model.ping_periodically),
             ('n',     'device number .....................................', True),
             ('c',     'connections .......................................', True),
             ('d',     'message dots ......................................', True),
@@ -138,7 +139,10 @@ class View(object):
             ('m0',    'messages of selected device .......................', True),
             ('p1',    'pings of direct neighbors of selected device ......', False),
             ('e1',    'echos of direct neighbors of selected device ......', True),
-            ('m1',    'messages of direct neighbors of selected device ...', True)
+            ('m1',    'messages of direct neighbors of selected device ...', True),
+            ('p2',    'pings of all neighbors ............................', False),
+            ('e2',    'echos of all neighbors ............................', False),
+            ('m2',    'messages of all neighbors .........................', False)
         ]
         self.settings = pd.DataFrame({
             'KEY'         : list(map(lambda x : x[0], init_settings)),
@@ -199,7 +203,7 @@ class View(object):
             if not isinstance(d, Device): continue
             x = int(SCREEN_SCALE*d.n.x)
             y = int(SCREEN_SCALE*d.n.y)
-            color =  self.get_device_color(sd, d, d.sent_messages, self.model.dt)
+            color = self.get_device_color(sd, d, d.sent_messages, self.model.dt)
             pygame.draw.circle(
                 self.surface,
                 color,
@@ -213,18 +217,34 @@ class View(object):
 
         if  (not self.settings.at['f', 'STATE']) or \
             (sd == None) or \
-            (sd != d and (not (d in self.model.connections[sd]))):
+            (
+                sd != d and \
+                (not (d in self.model.connections[sd])) and \
+                (not (
+                    self.settings.at['p2', 'STATE'] or \
+                    self.settings.at['e2', 'STATE'] or \
+                    self.settings.at['m2', 'STATE'])
+                )
+            ):
             return pygame.Color(DEVICE_DEFAULT_COLOR[0])
 
+        _p, _e, _m = self.settings.at['p2', 'STATE'], self.settings.at['e2', 'STATE'], self.settings.at['m2', 'STATE']
         if d == sd: # selected device
-            _p, _e, _m = self.settings.at['p0', 'STATE'], self.settings.at['e0', 'STATE'], self.settings.at['m0', 'STATE']
-        else: # neighbor
-            _p, _e, _m = self.settings.at['p1', 'STATE'], self.settings.at['e1', 'STATE'], self.settings.at['m1', 'STATE']
+            _p |= self.settings.at['p0', 'STATE']
+            _e |= self.settings.at['e0', 'STATE']
+            _m |= self.settings.at['m0', 'STATE']
+        elif d in self.model.connections[sd]: # neighbor
+            _p |= self.settings.at['p1', 'STATE']
+            _e |= self.settings.at['e1', 'STATE']
+            _m |= self.settings.at['m1', 'STATE']
+
         p, e, m = False, False, False
-        for m in sent_messages:
-            is_ping = m.m.startswith('PING')
-            is_echo = m.m.startswith('ECHO')
+        for message in sent_messages:
+            is_ping = message.m.startswith('PING')
+            is_echo = message.m.startswith('ECHO')
+            print(d.num, _m, is_ping, is_echo)
             if _m and (not is_ping) and (not is_echo):
+                print('hi')
                 m = True
                 d.message_dist = 0
                 d.most_recent_message_type = 'message'
@@ -238,7 +258,7 @@ class View(object):
                 # if self.settings.at['e1', 'STATE']: only do echo's meant for the sd (if e1 )
                 # if self.settings.at['e0', 'STATE']: draw all its (the sd's) echos
                 if self.settings.at['e1', 'STATE']:
-                    _, rs, _ = d.n.parse_echo(m) # rs = random string
+                    _, rs, _ = d.n.parse_echo(message) # rs = random string
                     if rs not in sd.n.pings.keys():
                         continue
 
@@ -280,6 +300,7 @@ class View(object):
                 echo_color = DEVICE_DEFAULT_COLOR[1]
 
         if m:
+            print('AYYYYYYYY')
             message_color = DEVICE_MESSAGE_COLOR[1]
         else:
             if d.message_dist != None:
@@ -348,6 +369,10 @@ class View(object):
                         (self.settings.at['p1', 'STATE'] and signal['message_type'] == 'ping') or
                         (self.settings.at['e1', 'STATE'] and signal['message_type'] == 'echo')
                     )
+                ) or (
+                    (self.settings.at['m2', 'STATE'] and signal['message_type'] == 'message') or
+                    (self.settings.at['p2', 'STATE'] and signal['message_type'] == 'ping') or
+                    (self.settings.at['e2', 'STATE'] and signal['message_type'] == 'echo')
                 )
             ): continue
 
@@ -361,18 +386,24 @@ class View(object):
         for _edge in self.model.edges:
             edge = tuple(_edge)
 
-            # filter which dots to draw
-            if sd not in edge: continue # only draw signals going to/from sd
-            if signal['message_type'] == 'echo': # only draw echo dot to intended receiver_node
-                nd = edge[0] if edge[1] == sd else edge[1] # nd = neighboring device (of selected device)
-                rd = nd if sn == sd.n else sd # rd = receiver device
-                rn_id, _, _ = sd.n.parse_echo(signal['message']) # receiver node according to echo message
-                if rd.n.sk != rn_id: continue
-                if {rd, signal['sender_device']} != _edge: continue # only draw on the edge with both sender and receiver device
-            if signal['message_type'] == 'ping':
-                if signal['sender_device'] != sd: # if a neighboring device is sending the ping
-                    # only draw it on the edge between that neighboring device and sd
-                    if {signal['sender_device'], sd} != _edge: continue
+            # filter which dots to draw (unless *2 is True and its * message_type)
+            if not (
+                    (self.settings.at['m2', 'STATE'] and signal['message_type'] == 'message') or
+                    (self.settings.at['p2', 'STATE'] and signal['message_type'] == 'ping') or
+                    (self.settings.at['e2', 'STATE'] and signal['message_type'] == 'echo')
+                ):
+
+                if sd not in edge: continue # only draw signals going to/from sd
+                if signal['message_type'] == 'echo': # only draw echo dot to intended receiver_node
+                    nd = edge[0] if edge[1] == sd else edge[1] # nd = neighboring device (of selected device)
+                    rd = nd if sn == sd.n else sd # rd = receiver device
+                    rn_id, _, _ = sd.n.parse_echo(signal['message']) # receiver node according to echo message
+                    if rd.n.sk != rn_id: continue
+                    if {rd, signal['sender_device']} != _edge: continue # only draw on the edge with both sender and receiver device
+                if signal['message_type'] == 'ping':
+                    if signal['sender_device'] != sd: # if a neighboring device is sending the ping
+                        # only draw it on the edge between that neighboring device and sd
+                        if {signal['sender_device'], sd} != _edge: continue
 
             # if just one, XOR, of the connection endpoints is within the signal ring
             n1, n2 = edge[0].n, edge[1].n
@@ -462,10 +493,14 @@ class View(object):
                         (self.settings.at['p1', 'STATE'] and signal['message_type'] == 'ping') or
                         (self.settings.at['e1', 'STATE'] and signal['message_type'] == 'echo')
                     )
+                ) or (
+                    (self.settings.at['m2', 'STATE'] and signal['message_type'] == 'message') or
+                    (self.settings.at['p2', 'STATE'] and signal['message_type'] == 'ping') or
+                    (self.settings.at['e2', 'STATE'] and signal['message_type'] == 'echo')
                 )
             ): continue
 
-            if signal['message_type'] == 'echo': # only draw echo dot to intended receiver_node
+            if signal['message_type'] == 'echo' and (not self.settings.at['e2', 'STATE']): # only draw echo dot to intended receiver_node (unless e2 is True)
                 rn_id, _, _ = sd.n.parse_echo(signal['message']) # rn_id = receiver node id
 
                 if d0 == sd:
@@ -475,6 +510,7 @@ class View(object):
                     if rn_id == sd.n.sk:
                         pass
                     else:
+                        # pass
                         continue
 
             color = SIGNAL_MESSAGE_COLOR[1]
@@ -563,6 +599,13 @@ class Model(object):
         self.boot()
     def boot(self):
 
+        # controller variables
+        self.selected_device   = None  # device user clicked on
+        self.pause_devices     = False # pause/play movement
+        self.pause_signals     = False # pause/play signals
+        self.ping_periodically = True  # have the nodes send each other pings on periodic intervals
+        self.manual_message    = None  # list of messages created manually by user of simulation
+
         t = current_time() if TIME_OR_ITERATION_BASED else 0
         self.pt = t # pt = time of previous time step (1 time step in the past)
         self.dt = 0 # t - self.pt
@@ -584,11 +627,6 @@ class Model(object):
                 ...]
             '''
         self.signals = []
-        
-        # controller variables
-        self.selected_device = None  # device user clicked on
-        self.pause_devices   = False # pause/play movement
-        self.pause_signals   = False # pause/play signals
 
 
     # main_loop of the model
@@ -656,6 +694,9 @@ class Model(object):
                 # n.print_n(i=i+1, num_nodes=len(devices), newline_start=True)
                 sent_messages, updt_cnsl_dsply = \
                     d.main_loop(t, verbose=d==self.selected_device)
+                if d == self.selected_device and self.manual_message != None:
+                    sent_messages.append(self.manual_message)
+                    self.manual_message = None
                 if d == self.selected_device and updt_cnsl_dsply:
                     update_console(caller='selected device perceived neighbor update')
                 for message in sent_messages:
@@ -699,7 +740,7 @@ class Model(object):
                     # print('num_devices_to_add = %d' % num_devices_to_add)
                 while num_devices_to_add > 0:
                     num_devices_to_add -= 1
-                    devices.append(Device(devices, t))
+                    devices.append(Device(devices, t, self.ping_periodically))
 
             self.devices = devices
 
@@ -751,7 +792,7 @@ class Model(object):
         n_to_create = int(((N_MAX - N_MIN) / 2) + N_MIN) # create halfway between N_MIN and N_MAX
         while n_to_create > 0:
             n_to_create -= 1
-            devices.append(Device(devices, t))
+            devices.append(Device(devices, t, self.ping_periodically))
         if verbose:
             print('Nodes:')
             num_devices = len(devices)
@@ -926,6 +967,14 @@ class Controller(object):
                 self.buffer += event.unicode
                 print(self.buffer, end="\r", flush=True)
 
+            elif event.key == pygame.K_a: # toogle ping_periodically of nodes
+                if verbose: print('a')
+                pp = not self.model.ping_periodically
+                self.model.ping_periodically = pp
+                for device in self.model.devices:
+                    device.n.ping_periodically = pp
+                self.update_view_settings('a')
+
             elif event.key == pygame.K_SPACE: # toggle pause/play of movement of devices
                 if verbose: print('space bar')
                 self.model.pause_devices = not self.model.pause_devices
@@ -944,13 +993,13 @@ class Controller(object):
             elif event.key == pygame.K_f: self.update_view_settings('f') # toggle draw node flash from signal
             elif event.key == pygame.K_n: self.update_view_settings('n') # toggle draw device number
 
-            elif event.key == pygame.K_1:
+            elif event.key == pygame.K_8:
                 if self.model.selected_device != None:
                     t = self.model.pt + self.model.dt
                     ping = self.model.selected_device.n.ping(t)
                     self.model.start_signal(self.model.selected_device, ping)
 
-            elif event.key == pygame.K_2:
+            elif event.key == pygame.K_9:
                 if self.model.selected_device != None:
                     self.entering_custom_message = True
 
@@ -960,14 +1009,18 @@ class Controller(object):
                 if self.entering_custom_message:
                     self.entering_custom_message = False
                     message = self.model.selected_device.n.send_message(self.buffer)
+                    self.model.manual_message = message
                     self.model.start_signal(self.model.selected_device, message)
 
                 elif self.buffer == 'p0': self.update_view_settings('p0') # toggle drawing pings of selected device
                 elif self.buffer == 'p1': self.update_view_settings('p1') # toggle drawing pings of direct neighbors of selected device
+                elif self.buffer == 'p2': self.update_view_settings('p2') # toggle drawing pings of direct neighbors of selected device
                 elif self.buffer == 'e0': self.update_view_settings('e0') # toggle drawing echos of selected device
                 elif self.buffer == 'e1': self.update_view_settings('e1') # toggle drawing echos of direct neighbors of selected device
+                elif self.buffer == 'e2': self.update_view_settings('e2') # toggle drawing echos of direct neighbors of selected device
                 elif self.buffer == 'm0': self.update_view_settings('m0') # toggle drawing messages of selected device
                 elif self.buffer == 'm1': self.update_view_settings('m1') # toggle drawing messages of direct neighbors of selected device
+                elif self.buffer == 'm2': self.update_view_settings('m2') # toggle drawing messages of direct neighbors of selected device
 
                 else:
                     if verbose: print('unknown buffer: %s' % self.buffer)

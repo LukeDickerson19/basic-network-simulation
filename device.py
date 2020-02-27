@@ -26,12 +26,12 @@ import numpy as np
 
 class Device(object):
 
-	def __init__(self, devices, t):
+	def __init__(self, devices, t, ping_periodically):
 
 		self.src, self.dst = self.set_source_and_destination(devices)
 		self.vel = self.set_velocity()
 		# print('src = (%.4f, %.4f)' % (self.src[0], self.src[1]))
-		self.n = Node(self.src[0], self.src[1], t, grid=False)
+		self.n = Node(self.src[0], self.src[1], t, ping_periodically, grid=False)
 		self.num = self.set_num(devices) # unique int from all the other devices
 
 

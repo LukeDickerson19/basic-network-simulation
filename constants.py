@@ -41,7 +41,6 @@ SCREEN_SIZE = (
 ) # pixel dimentions of display screen
 
 
-PING_PERIODICALLY = False # True if we want to make the nodes ping each other on periodic intervals, False if we don't
 TIME_OR_ITERATION_BASED = True # True for time based, False for iteration based
 SIGNAL_SPEED = 4.5 if TIME_OR_ITERATION_BASED else 0.09 # how far the signal travels per second (make sure this is faster than MAX_VEL)
 PING_FREQUENCY = 0.5 if TIME_OR_ITERATION_BASED else 0.01 # number of pings per second

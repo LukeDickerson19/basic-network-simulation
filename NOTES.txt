@@ -61,16 +61,16 @@ TO DO:
     NOW:
 
         make it so regular messages are passed along
-            this requires the display to show messages for ALL nodes
-                i think something like a p2, e2, and m2 would work
             this requires a way to be developed so that a node wont pass it along if its received it before
                 to keep loops from happening
+                it would have to keep track of what its seen before, and it would have to delete them eventually so the list didn't get too big, but how long do you wait to delete them?
 
         set up basic pk sk thing and fix display to support it
             use sha256 lib
             also google how it works and write a quick explaination of it somewhere in this repo
 
-    EVENTUALLY:
+            do this before you make the gifs for the readme
+
 
         the the block_printer fucks up when the text has more lines than the console can display
             depending on however zoomed in the console text is
@@ -88,6 +88,9 @@ TO DO:
                 however if we did this you couldn't copy/paste the public key because its not in the terminal anymore ...
                     perhaps use device number ... this interaction is just for the simulation anyway
                         or use "pk<device number>" and it parses it to the public key <----- THIS!!!!
+
+
+    EVENTUALLY:
 
         maybe pygame clock is better than time.time()
             clock = pygame.time.Clock()
