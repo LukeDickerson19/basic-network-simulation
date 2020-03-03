@@ -18,7 +18,7 @@ class Node(object):
 		self.ping_periodically = ping_periodically # boolean to flag if we want to ping periodically
 
 		self.sk = self.create_random_string() # sk = secret key
-		self.pk = '' # pk = public key
+		self.pk = self.sk #'' # pk = public key
 
 		# messages this node has received
 		# [(message1, time_received_message1), (message2, time_received_message2), ...]
@@ -41,18 +41,22 @@ class Node(object):
 		else:
 			self.prev_ping_t = -1 - random.randint(0, 1 / PING_FREQUENCY) # -1 to avoid ZeroDivisionError
 
+		self.recent_messages = []
+
 	def main_loop(self, t, verbose=False):
 		# if verbose: print('\nNode %s:' % self.sk)
 
 		messages_to_send = []
 
-		# ping on PING_FREQUENCY
-		if self.ping_periodically:
-			if 1.0 / (t - self.prev_ping_t) <= PING_FREQUENCY:
+		# on PING_FREQUENCY:
+		if 1.0 / (t - self.prev_ping_t) <= PING_FREQUENCY:
 
-				# remove nodes from neighbors list if they haven't responded to our previous ping in time
-				# (if this isn't done on PING_FREQUENCY, the simulation fps is WAY slower)
-				self.neighbors = self.neighbors[t - self.neighbors['Most Recent Echo Time'] <= MAX_POSSIBLE_PING_TIME]
+			# remove nodes from neighbors list if they haven't responded to our previous ping in time
+			# (if this isn't done on PING_FREQUENCY, the simulation's FPS is WAY slower)
+			self.neighbors = self.neighbors[t - self.neighbors['Most Recent Echo Time'] <= MAX_POSSIBLE_PING_TIME]
+
+			# if we're pinging on periodic intervals
+			if self.ping_periodically:
 
 				# then send the next ping
 				ping = self.ping(t, verbose=False)
@@ -81,12 +85,35 @@ class Node(object):
 
 			else:
 
-				############# insert response to blue messages here #############
-				#################################################################
+				# print('\nNode %s' % self.pk)
+				# print('received message:')
+				# print(message.m)
+
+				raw_m = ''
+				for line in message.m.split('\n'):
+					if len(line) != KEY_STR_LENGTH:
+						raw_m += line
+				if raw_m in self.recent_messages:
+					continue
+				else:
+					self.recent_messages.insert(0, raw_m)
+					if len(self.recent_messages) > MAX_NUM_RECORDED_RECENT_MESSAGES:
+						self.recent_messages = self.recent_messages[:-1]
+
+				if self.pk in message.m.split('\n'):
+					# print('self in list!')
+					continue
+				# print('self not in list')
+
+				response = self.send_message(message.m + ('\n' + self.pk if APPEND_VISITED else ''))
+				# print('response:')
+				# print(response.m)
+				# print()
+
+				messages_to_send.append(response) # causes message cycles D-:
 
 				# unread_messages.append((message, t))
-				# messages_to_send.append(message) # causes message cycles D-:
-				pass
+				# pass
 
 		self.mailbox = unread_messages
 		return messages_to_send, update_console_display
@@ -109,7 +136,7 @@ class Node(object):
 
 		return pings
 
-	def create_random_string(self, string_length=10):#256):
+	def create_random_string(self, string_length=KEY_STR_LENGTH):
 		return ''.join(
 			random.choice(ALL_CHARS) for i in range(string_length))
 

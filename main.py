@@ -23,7 +23,7 @@ fps = 0 # frames per second
 # print block to the console
 def update_console(caller=''):
     caller = caller+'\n' if False else '' # display/mute caller output
-    return
+    # return
 
     # simulation metrics
     sim_mtrcs = '\nSIMULATION METRICS:\n'
@@ -242,9 +242,7 @@ class View(object):
         for message in sent_messages:
             is_ping = message.m.startswith('PING')
             is_echo = message.m.startswith('ECHO')
-            print(d.num, _m, is_ping, is_echo)
             if _m and (not is_ping) and (not is_echo):
-                print('hi')
                 m = True
                 d.message_dist = 0
                 d.most_recent_message_type = 'message'
@@ -300,7 +298,6 @@ class View(object):
                 echo_color = DEVICE_DEFAULT_COLOR[1]
 
         if m:
-            print('AYYYYYYYY')
             message_color = DEVICE_MESSAGE_COLOR[1]
         else:
             if d.message_dist != None:
@@ -645,7 +642,7 @@ class Model(object):
             t = self.pt
             self.dt = 0
         
-        # if verbose: print('%s\nt = %s' % ('-'*180, t))
+        if verbose: print('%s\nt = %s' % ('-'*180, t))
 
         # update devices, connections, and edges, and sub-networks
         if not self.pause_devices:
@@ -705,15 +702,18 @@ class Model(object):
         # move the devices
         if not self.pause_devices:
             devices = []
+            sd = None
             num_devices_that_reached_their_dst = 0
             for d in self.devices:
                 reached_dst = d.move(self.connections[d], verbose=False)
                 if reached_dst:
                     num_devices_that_reached_their_dst += 1
                     if d == self.selected_device:
+                        sd = self.selected_device
                         self.selected_device = None
                 else:
                     devices.append(d)
+            update_network_state = sd != None
             while num_devices_that_reached_their_dst > 0:
                 num_devices_that_reached_their_dst -= 1
                 num_devices_left = len(devices)
@@ -737,12 +737,21 @@ class Model(object):
                     if 0.00 <= rn <= p0:    num_devices_to_add = 0
                     if p0    < rn <= p0+p1: num_devices_to_add = 1
                     if p0+p1 < rn <= 1.00:  num_devices_to_add = 2
+                    if num_devices_to_add == 0 and update_network_state:
+                        num_devices_to_add = 1
                     # print('num_devices_to_add = %d' % num_devices_to_add)
                 while num_devices_to_add > 0:
+                    new_device = Device(devices, t, self.ping_periodically)
+                    if sd != None:
+                        sd = None
+                        self.selected_device = new_device
                     num_devices_to_add -= 1
-                    devices.append(Device(devices, t, self.ping_periodically))
+                    devices.append(new_device)
 
             self.devices = devices
+            if update_network_state:
+                self.get_network_state(self.devices)
+
 
         # update pt at end of update()
         self.pt = t
@@ -802,12 +811,11 @@ class Model(object):
 
     # determine which devices are currently within signal range of each other
     def get_network_state(self, devices, verbose=False):
-        connections = {}  # {keys=devices : value={key=neighbor_device, value=distance}}
-        edges = []        # [{device0, device1}, {device2, device0}, ...]
-        sub_networks = [] # [{device0, device1, device2}, {device3, device4}, ...]
 
         # create connections and edges data structure,
         # also make deep copy of devices in unvisted_devices for creating sub_networks in the next iteration
+        connections = {}  # {keys=devices : value={key=neighbor_device, value=distance}}
+        edges = []        # [{device0, device1}, {device2, device0}, ...]
         unvisited_devices = set()
         for d0 in devices:
             if not isinstance(d0, Device): continue
@@ -823,6 +831,7 @@ class Model(object):
         # find all sub_networks
         # useful source for set operations:
         # https://dev.to/svinci/intersection-union-and-difference-of-sets-in-python-4gkn
+        sub_networks = [] # [{device0, device1, device2}, {device3, device4}, ...]
         while unvisited_devices != set():
 
             # pick a random device in list of unvisited devices
@@ -1008,9 +1017,8 @@ class Controller(object):
 
                 if self.entering_custom_message:
                     self.entering_custom_message = False
-                    message = self.model.selected_device.n.send_message(self.buffer)
-                    self.model.manual_message = message
-                    self.model.start_signal(self.model.selected_device, message)
+                    self.model.manual_message = self.model.selected_device.n.send_message(
+                        self.buffer + ('\n' + self.model.selected_device.n.pk if APPEND_VISITED else ''))
 
                 elif self.buffer == 'p0': self.update_view_settings('p0') # toggle drawing pings of selected device
                 elif self.buffer == 'p1': self.update_view_settings('p1') # toggle drawing pings of direct neighbors of selected device
