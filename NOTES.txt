@@ -60,41 +60,14 @@ TO DO:
 
     NOW:
 
-        make gif of nodes moving and selecting a device
-
-        make gif of selecting a device then pausing and seeing period pings then pausing periodic pings
-
-        make gif of message
-
-        the recent messages thing should have a time limit of a few seconds
-
-        make it so regular messages are passed along
-            this requires a way to be developed so that a node wont pass the message along if its received the message before.
-                this is to keep infinite loop from occuring ...
-
-                Each node would have to keep track of what its seen before in a list, and not send stuff its seen before. However it would have to delete them eventually so the list doesn't get too big, but how long do you wait to delete them?
-
-                OR
-
-                Each time a node relays a message it adds on its signature to a list of signatures the message has
-                If the node receives the message again it will look in the list and if its name is in the list it will not relay the message again.
-
-                If a node rece
-
-                When a node sends a message it:
-                    needs to send its list of all its direct neighbors.
-                    update the counter of the number of branches in the network away from the original sender of the message
-
-                    create a table with exach node in the radius
-                    columns for public key, and update status
-
-
-
         set up basic pk sk thing and fix display to support it
             use sha256 lib
             also google how it works and write a quick explaination of it somewhere in this repo
 
             do this before you make the gifs for the readme
+
+            How to generate SSH key pairs with Python
+            https://stackoverflow.com/questions/2466401/how-to-generate-ssh-key-pairs-with-python
 
 
         the the block_printer fucks up when the text has more lines than the console can display
