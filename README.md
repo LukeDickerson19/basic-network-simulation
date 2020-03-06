@@ -4,8 +4,9 @@
 
 This code is a simulation of portable devices (like smartphones and tablets) that move in an out of a 2D rectangular environment. Each device has a max signal range it can send and receive signals direclty. The simulation has a GUI display (using Pygame GUI library) as seen below.
 
-![results](https://github.com/PopeyedLocket/sma-tsl-switch/blob/master/images/asset-BTC_x-1_w-100.png?raw=true "Results")
-
+<img src="https://github.com/PopeyedLocket/basic-network-simulation/blob/master/images_and_videos/video1-devices_moving.gif">
+<img src="https://github.com/PopeyedLocket/basic-network-simulation/blob/master/images_and_videos/video1-devices_moving.gif" width="1200" height="800">
+<img src="https://github.com/PopeyedLocket/basic-network-simulation/blob/master/images_and_videos/video1-devices_moving.gif" width="900" height="600">
 <img src="https://github.com/PopeyedLocket/basic-network-simulation/blob/master/images_and_videos/video1-devices_moving.gif" width="600" height="400">
 
 You can pause the movement of the devices, click on a device, and see its signal range highlighted around it, the ping messages it sends on regular intervals in red and the echo messages it receives back in green (the devices' movement is paused, but not the signals the devices send each other).
