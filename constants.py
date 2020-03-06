@@ -4,6 +4,9 @@ import math
 import string
 import pygame
 
+import warnings
+warnings.filterwarnings("ignore", message="invalid value encountered in arccos") 
+# source: https://stackoverflow.com/questions/14463277/how-to-disable-python-warnings
 
 
 
@@ -42,7 +45,7 @@ SCREEN_SIZE = (
 
 
 TIME_OR_ITERATION_BASED = True # True for time based, False for iteration based
-SIGNAL_SPEED = 2.5 if TIME_OR_ITERATION_BASED else 0.09 # how far the signal travels per second (make sure this is faster than MAX_VEL)
+SIGNAL_SPEED = 11.0 if TIME_OR_ITERATION_BASED else 0.09 # how far the signal travels per second (make sure this is faster than MAX_VEL)
 PING_FREQUENCY = 0.5 if TIME_OR_ITERATION_BASED else 0.01 # number of pings per second
 MAX_POSSIBLE_PING_TIME = (2.0 * R) / SIGNAL_SPEED
 def current_time():

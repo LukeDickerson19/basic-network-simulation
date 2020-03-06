@@ -16,6 +16,8 @@ from message import Message
 import numpy as np
 from block_printer import BlockPrinter
 
+
+
 # global variables
 bp = BlockPrinter()
 fps = 0 # frames per second
@@ -111,7 +113,6 @@ def update_console(caller=''):
         gui_settings + \
         selected_device_info + \
         network_info)
-
 
 
 class View(object):

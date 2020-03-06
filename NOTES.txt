@@ -60,6 +60,12 @@ TO DO:
 
     NOW:
 
+        make gif of nodes moving and selecting a device
+
+        make gif of selecting a device then pausing and seeing period pings then pausing periodic pings
+
+        make gif of message
+
         the recent messages thing should have a time limit of a few seconds
 
         make it so regular messages are passed along
