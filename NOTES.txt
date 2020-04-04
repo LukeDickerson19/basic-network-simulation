@@ -64,8 +64,6 @@ TO DO:
             use sha256 lib
             also google how it works and write a quick explaination of it somewhere in this repo
 
-            do this before you make the gifs for the readme
-
             How to generate SSH key pairs with Python
             https://stackoverflow.com/questions/2466401/how-to-generate-ssh-key-pairs-with-python
 
