@@ -24,18 +24,19 @@ To make this app, developers are provided with the Node class which can be impor
 
 
 
-## Usage:
+### Setup
+```
+git clone git@github.com:PopeyedLocket/basic-network-simulation.git # download repository
+cd basic-network-simulation # enter repository folder
+python3 -m venv ./virt_env # create a virtual environment
+source ./virt_env/bin/activate # activate virtual environment
+pip install -r ./src/requirements.txt # install all the required libraries
+```
 
-python main.py
-
-
-
-## Requirements:
-
-pandas
-numpy
-hashlib
-pygame
-
-
+### Usage
+```
+cd value-investing-app # enter repository folder
+source ./virt_env/bin/activate # activate virtual environment
+python ./src/main.py # collect data
+```
 
