@@ -16,11 +16,7 @@ Devices can also send each other messages with arbitrary data, that is neither a
 
 <img src="https://github.com/PopeyedLocket/basic-network-simulation/blob/master/images_and_videos/video3-custome_message-moving_devices.gif">
 
-<img src="https://github.com/PopeyedLocket/basic-network-simulation/blob/master/images_and_videos/video3-custome_message-stationary_devices.gif">
-
-The reason this simulation was created is to provide the playground to create an application that a device (be it simulated, or real) can install and run. The goal of the app is to give a device the ability to be a router and communicate with other devices that also have the app directly and give all the devices the collective ability to store and process data on a single distributed data base.
-
-To make this app, developers are provided with the Node class which can be imported and made the parent class of the various types of nodes in their network. The Node class allows its child classes to send messages, and automatically ping and echo each other. See Node.py for all the functions it provides.
+Currently the messages sent create what is called a [broadcast storm](https://en.wikipedia.org/wiki/Broadcast_storm), so some protocal of how messages are coordinated would need to be made to keep that from happening. The end goal being to create an app that enables users to communicate via a mesh network. To make this app, developers are provided with the Node class which can be imported and made the parent class of the various types of nodes in their network. The Node class allows its child classes to send messages, and automatically ping and echo each other. See node.py for all the functions it provides.
 
 
 
@@ -35,8 +31,8 @@ pip install -r ./src/requirements.txt # install all the required libraries
 
 ### Usage
 ```
-cd value-investing-app # enter repository folder
+cd basic-network-simulation # enter repository folder
 source ./virt_env/bin/activate # activate virtual environment
-python ./src/main.py # collect data
+python ./src/main.py # run simulation
 ```
 
