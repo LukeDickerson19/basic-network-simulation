@@ -2,7 +2,7 @@
 
 ## Description:
 
-This code is a simulation of portable devices (like smartphones and tablets) that move in an out of a 2D rectangular environment. Each device has a max signal range it can send and receive signals directly. The simulation has a GUI display as seen below.
+This code is a simulation of portable devices (like smartphones and tablets) that move in and out of a 2D rectangular environment. Each device has a max signal range it can send and receive signals directly. The simulation has a GUI display as seen below.
 
 <img src="https://github.com/PopeyedLocket/basic-network-simulation/blob/master/images_and_videos/video1-devices_moving.gif">
 
@@ -16,7 +16,7 @@ Devices can also send each other messages with arbitrary data, that is neither a
 
 <img src="https://github.com/PopeyedLocket/basic-network-simulation/blob/master/images_and_videos/video3-custome_message-moving_devices.gif">
 
-Currently the nodes just relay any message they recieve to all their direct neighbors creating what is called a [broadcast storm](https://en.wikipedia.org/wiki/Broadcast_storm), so some protocal of how messages are coordinated would need to be made to keep that from happening. The end goal being to create an app that enables users to communicate via a mesh network. To make this app, developers are provided with the Node class which can be imported and made the parent class of the various types of nodes in their network. The Node class allows its child classes to send messages, and automatically ping and echo each other. See node.py for all the functions it provides.
+Currently the nodes just relay any message they recieve to all their direct neighbors creating what is called a [broadcast storm](https://en.wikipedia.org/wiki/Broadcast_storm), so I need to make some protocal of how messages are coordinated to keep that from happening. The end goal being to make an app that enables users to communicate via a mesh network. To make this app, developers are provided with the Node class which can be imported and made the parent class of the various types of nodes in their network. The Node class allows its child classes to send messages, and automatically ping and echo each other. See node.py for all the functions it provides.
 
 
 
